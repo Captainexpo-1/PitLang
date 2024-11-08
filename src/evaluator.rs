@@ -1,8 +1,12 @@
 use crate::ast::ASTNode;
+use crate::stdlib::{number_methods, string_methods};
 use crate::tokenizer::TokenKind;
+use core::num;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+type StdMethod = fn(&Value, Vec<Value>) -> Value;
 
 pub fn evaluate(program: &ASTNode) -> Value {
     let mut evaluator = TreeWalk::new(match program {
@@ -15,7 +19,7 @@ pub fn evaluate(program: &ASTNode) -> Value {
     evaluator.evaluate_program()
 }
 
-fn runtime_error(msg: &str) -> Value {
+pub fn runtime_error(msg: &str) -> Value {
     panic!("Runtime error: {}", msg);
 }
 
@@ -27,6 +31,10 @@ pub enum Value {
     Return(Box<Value>),
     Function(Vec<String>, ASTNode),
     Object(Rc<RefCell<HashMap<String, Value>>>),
+    Method {
+        receiver: Box<Value>,
+        method_name: String,
+    },
     Null,
     Unit,
 }
@@ -49,6 +57,12 @@ impl Value {
             Value::Return(val) => val.print(),
             Value::Null => println!("null"),
             Value::Object(_) => println!("Object"),
+            Value::Method {
+                receiver,
+                method_name,
+            } => {
+                println!("Method: {:.?}.{}", receiver, method_name)
+            }
             Value::Unit => (),
         }
     }
@@ -111,7 +125,8 @@ impl<'a> TreeWalk<'a> {
     fn evaluate_node(&mut self, node: &ASTNode) -> Value {
         match node {
             ASTNode::NumberLiteral(n) => Value::Number(*n),
-            //ASTNode::BooleanLiteral(b) => Value::Boolean(*b),
+            ASTNode::BooleanLiteral(b) => Value::Boolean(*b),
+            ASTNode::NullLiteral => Value::Null,
             ASTNode::ObjectLiteral(properties) => {
                 let mut obj = HashMap::new();
                 for (key, val) in properties {
@@ -140,7 +155,10 @@ impl<'a> TreeWalk<'a> {
                         runtime_error(&format!("Property '{}' not found", member))
                     })
                 } else {
-                    runtime_error("Attempted member access on non-object value")
+                    Value::Method {
+                        receiver: Box::new(obj_val),
+                        method_name: member.clone(),
+                    }
                 }
             }
             ASTNode::Block(statements) => {
@@ -216,6 +234,14 @@ impl<'a> TreeWalk<'a> {
                             result
                         }
                     }
+                    Value::Method {
+                        receiver,
+                        method_name,
+                    } => self.call_method(
+                        *receiver,
+                        &method_name,
+                        &arguments.iter().map(|arg| Box::new(arg.clone())).collect(),
+                    ),
                     _ => runtime_error("Called value is not a function"),
                 }
             }
@@ -227,7 +253,34 @@ impl<'a> TreeWalk<'a> {
             _ => runtime_error(format!("Unsupported AST node: {:?}", node).as_str()),
         }
     }
+    fn call_method(
+        &mut self,
+        receiver: Value,
+        method_name: &str,
+        arg_nodes: &Vec<Box<ASTNode>>,
+    ) -> Value {
+        let args: Vec<Value> = arg_nodes
+            .iter()
+            .map(|arg| self.evaluate_node(arg))
+            .collect();
 
+        let string_methods = string_methods();
+        let number_methods = number_methods();
+        let method = match &receiver {
+            Value::String(_) => string_methods.get(method_name),
+            Value::Number(_) => number_methods.get(method_name),
+            _ => None,
+        };
+
+        if let Some(method) = method {
+            method(&receiver, args)
+        } else {
+            runtime_error(&format!(
+                "Method '{}' not found for {:?}",
+                method_name, receiver
+            ))
+        }
+    }
     fn evaluate_binary_op(&mut self, op: &TokenKind, left: &ASTNode, right: &ASTNode) -> Value {
         let left_val = self.evaluate_node(left);
         if let Value::Return(_) = left_val {

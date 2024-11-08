@@ -31,7 +31,7 @@ impl<'a> Parser<'a> {
             TokenKind::If => self.parse_if_statement(),
             TokenKind::Function => self.parse_function_declaration(true),
             TokenKind::Return => self.parse_return_statement(),
-            //TokenKind::LBrace => self.parse_block(),
+            TokenKind::LBrace => self.parse_block(),
             TokenKind::SemiColon => {
                 self.advance();
                 self.parse_statement()
@@ -66,6 +66,10 @@ impl<'a> Parser<'a> {
 
     fn parse_return_statement(&mut self) -> ASTNode {
         self.expect(TokenKind::Return);
+        if self.tokens[self.current].kind == TokenKind::SemiColon {
+            self.expect(TokenKind::SemiColon);
+            return ASTNode::ReturnStatement(Box::new(ASTNode::NullLiteral));
+        }
         let returnee = self.parse_expression(0);
         self.expect(TokenKind::SemiColon);
         ASTNode::ReturnStatement(Box::new(returnee))
@@ -197,7 +201,9 @@ impl<'a> Parser<'a> {
             TokenKind::String => ASTNode::StringLiteral(token.value.clone()),
             TokenKind::Identifier => ASTNode::Variable(token.value.clone()),
             TokenKind::Function => self.parse_function_declaration(false),
-
+            TokenKind::True => ASTNode::BooleanLiteral(true),
+            TokenKind::False => ASTNode::BooleanLiteral(false),
+            TokenKind::Null => ASTNode::NullLiteral,
             TokenKind::Dot => {
                 let member = self.advance().value.clone();
                 ASTNode::MemberAccess {
@@ -252,6 +258,10 @@ impl<'a> Parser<'a> {
             TokenKind::Dot => 5,    // For member access
             _ => 0,
         }
+    }
+
+    fn peek(&mut self) -> &Token {
+        &self.tokens[self.current + 1]
     }
 
     fn advance(&mut self) -> &Token {

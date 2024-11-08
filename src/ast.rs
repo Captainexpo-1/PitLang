@@ -4,6 +4,8 @@ use crate::tokenizer::TokenKind;
 pub enum ASTNode {
     NumberLiteral(f64),
     StringLiteral(String),
+    BooleanLiteral(bool),
+    NullLiteral,
     Expression(Box<ASTNode>),
     Variable(String),
     Program(Vec<ASTNode>),

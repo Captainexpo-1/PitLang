@@ -1,9 +1,0 @@
-let object = {
-    x: 2,
-    say_hello: fn(self) {
-        self.x = 3;
-    }
-};
-
-object.say_hello(object);
-print(object.x);

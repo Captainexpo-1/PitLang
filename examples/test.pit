@@ -1,0 +1,9 @@
+fn say_hello_world(n){
+    if n == 0 {
+        return 0;
+    }
+    print("Hello, World!");
+    say_hello_world(n-1);
+}
+
+say_hello_world(5);

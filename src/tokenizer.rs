@@ -31,6 +31,9 @@ pub enum TokenKind {
     Comma,
     Dot,
     Colon,
+    Null,
+    True,
+    False,
     EOF,
 }
 
@@ -57,6 +60,9 @@ fn get_identifier(id: String) -> Token {
         "if" => Token::new(TokenKind::If, id),
         "else" => Token::new(TokenKind::Else, id),
         "return" => Token::new(TokenKind::Return, id),
+        "null" => Token::new(TokenKind::Null, id),
+        "true" => Token::new(TokenKind::True, id),
+        "false" => Token::new(TokenKind::False, id),
         _ => Token::new(TokenKind::Identifier, id),
     }
 }
