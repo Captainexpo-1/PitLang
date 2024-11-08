@@ -143,15 +143,11 @@ impl<'a> Parser<'a> {
 
         match token.kind {
             TokenKind::Assign => {
-                if let ASTNode::Variable(name) = left {
-                    let right = self.parse_expression(precedence);
-                    ASTNode::BinaryOp {
-                        left: Box::new(ASTNode::Variable(name)),
-                        op: token.kind,
-                        right: Box::new(right),
-                    }
-                } else {
-                    panic!("Left-hand side of assignment must be a variable");
+                let right = self.parse_expression(precedence);
+                ASTNode::BinaryOp {
+                    left: Box::new(left),
+                    op: token.kind,
+                    right: Box::new(right),
                 }
             }
             TokenKind::LParen => {

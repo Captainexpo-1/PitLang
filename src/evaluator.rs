@@ -1,6 +1,8 @@
 use crate::ast::ASTNode;
 use crate::tokenizer::TokenKind;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub fn evaluate(program: &ASTNode) -> Value {
     let mut evaluator = TreeWalk::new(match program {
@@ -24,7 +26,7 @@ pub enum Value {
     String(String),
     Return(Box<Value>),
     Function(Vec<String>, ASTNode),
-    Object(HashMap<String, Value>),
+    Object(Rc<RefCell<HashMap<String, Value>>>),
     Null,
     Unit,
 }
@@ -115,7 +117,7 @@ impl<'a> TreeWalk<'a> {
                 for (key, val) in properties {
                     obj.insert(key.clone(), self.evaluate_node(val));
                 }
-                Value::Object(obj)
+                Value::Object(Rc::new(RefCell::new(obj)))
             }
             ASTNode::StringLiteral(s) => Value::String(s.clone()),
             ASTNode::Variable(name) => self
@@ -134,7 +136,7 @@ impl<'a> TreeWalk<'a> {
             ASTNode::MemberAccess { object, member } => {
                 let obj_val = self.evaluate_node(object);
                 if let Value::Object(properties) = obj_val {
-                    properties.get(member).cloned().unwrap_or_else(|| {
+                    properties.borrow().get(member).cloned().unwrap_or_else(|| {
                         runtime_error(&format!("Property '{}' not found", member))
                     })
                 } else {
@@ -272,15 +274,25 @@ impl<'a> TreeWalk<'a> {
                 (Value::Number(a), Value::Number(b)) => Value::Boolean(a < b),
                 _ => runtime_error("Operands must be numbers"),
             },
-            TokenKind::Assign => {
-                if let ASTNode::Variable(name) = left {
+            TokenKind::Assign => match left {
+                ASTNode::Variable(name) => {
                     self.global_environment
                         .insert(name.clone(), right_val.clone());
                     right_val
-                } else {
-                    runtime_error("Left side of assignment must be a variable")
                 }
-            }
+                ASTNode::MemberAccess { object, member } => {
+                    let obj_val = self.evaluate_node(object);
+                    if let Value::Object(properties) = obj_val {
+                        properties
+                            .borrow_mut()
+                            .insert(member.clone(), right_val.clone());
+                        Value::Object(properties)
+                    } else {
+                        runtime_error("Attempted member access on non-object value")
+                    }
+                }
+                _ => runtime_error("Left side of assignment must be a variable"),
+            },
             _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
         }
     }
