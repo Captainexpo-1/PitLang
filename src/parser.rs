@@ -217,9 +217,6 @@ impl<'a> Parser<'a> {
                 expr
             }
             TokenKind::LBrace => {
-                // Object literal
-                println!("Object literal");
-
                 let mut properties: Vec<(String, ASTNode)> = Vec::new();
 
                 while self.tokens[self.current].kind != TokenKind::RBrace {
@@ -233,6 +230,18 @@ impl<'a> Parser<'a> {
                 }
                 self.expect(TokenKind::RBrace);
                 ASTNode::ObjectLiteral(properties)
+            }
+            TokenKind::LBrack => {
+                let mut elements: Vec<ASTNode> = Vec::new();
+
+                while self.tokens[self.current].kind != TokenKind::RBrack {
+                    elements.push(self.parse_expression(0));
+                    if self.tokens[self.current].kind == TokenKind::Comma {
+                        self.advance();
+                    }
+                }
+                self.expect(TokenKind::RBrack);
+                ASTNode::ArrayLiteral(elements)
             }
             TokenKind::Minus => ASTNode::UnaryOp {
                 op: token.kind,
@@ -258,10 +267,6 @@ impl<'a> Parser<'a> {
             TokenKind::Dot => 5,    // For member access
             _ => 0,
         }
-    }
-
-    fn peek(&mut self) -> &Token {
-        &self.tokens[self.current + 1]
     }
 
     fn advance(&mut self) -> &Token {

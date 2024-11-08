@@ -117,6 +117,14 @@ pub fn tokenize(text: String) -> Vec<Token> {
                 tokens.push(Token::new(TokenKind::RBrace, "}".to_string()));
                 chars.next();
             }
+            '[' => {
+                tokens.push(Token::new(TokenKind::LBrack, "[".to_string()));
+                chars.next();
+            }
+            ']' => {
+                tokens.push(Token::new(TokenKind::RBrack, "]".to_string()));
+                chars.next();
+            }
             ' ' | '\t' | '\r' | '\n' | '\x0c' => {
                 chars.next();
             }

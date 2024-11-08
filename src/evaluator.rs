@@ -1,12 +1,9 @@
 use crate::ast::ASTNode;
-use crate::stdlib::{number_methods, string_methods};
+use crate::stdlib::{array_methods, number_methods, string_methods};
 use crate::tokenizer::TokenKind;
-use core::num;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-type StdMethod = fn(&Value, Vec<Value>) -> Value;
 
 pub fn evaluate(program: &ASTNode) -> Value {
     let mut evaluator = TreeWalk::new(match program {
@@ -29,6 +26,7 @@ pub enum Value {
     Boolean(bool),
     String(String),
     Return(Box<Value>),
+    Array(Rc<RefCell<Vec<Value>>>),
     Function(Vec<String>, ASTNode),
     Object(Rc<RefCell<HashMap<String, Value>>>),
     Method {
@@ -50,18 +48,28 @@ impl Value {
     }
     pub fn print(&self) {
         match self {
-            Value::Number(n) => println!("{}", n),
-            Value::Boolean(b) => println!("{}", b),
-            Value::String(s) => println!("{}", s),
-            Value::Function(_, _) => println!("Function"),
+            Value::Number(n) => print!("{}", n),
+            Value::Boolean(b) => print!("{}", b),
+            Value::String(s) => print!("{}", s),
+            Value::Function(_, _) => print!("Function"),
             Value::Return(val) => val.print(),
-            Value::Null => println!("null"),
-            Value::Object(_) => println!("Object"),
+            Value::Null => print!("null"),
+            Value::Object(_) => print!("Object"),
+            Value::Array(values) => {
+                print!("[");
+                for (i, val) in values.borrow().iter().enumerate() {
+                    val.print();
+                    if i < values.borrow().len() - 1 {
+                        print!(", ");
+                    }
+                }
+                print!("]");
+            }
             Value::Method {
                 receiver,
                 method_name,
             } => {
-                println!("Method: {:.?}.{}", receiver, method_name)
+                print!("Method: {:.?}.{}", receiver, method_name)
             }
             Value::Unit => (),
         }
@@ -135,6 +143,13 @@ impl<'a> TreeWalk<'a> {
                 Value::Object(Rc::new(RefCell::new(obj)))
             }
             ASTNode::StringLiteral(s) => Value::String(s.clone()),
+            ASTNode::ArrayLiteral(values) => {
+                let mut arr = Vec::new();
+                for val in values {
+                    arr.push(self.evaluate_node(val));
+                }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
             ASTNode::Variable(name) => self
                 .global_environment
                 .get(name)
@@ -209,6 +224,7 @@ impl<'a> TreeWalk<'a> {
                     if name == "print" {
                         let arg = self.evaluate_node(arguments.first().unwrap());
                         arg.print();
+                        println!();
                         return Value::Unit;
                     }
                 };
@@ -240,7 +256,10 @@ impl<'a> TreeWalk<'a> {
                     } => self.call_method(
                         *receiver,
                         &method_name,
-                        &arguments.iter().map(|arg| Box::new(arg.clone())).collect(),
+                        &arguments
+                            .iter()
+                            .map(|arg| Box::new(arg.clone()))
+                            .collect::<Vec<_>>(),
                     ),
                     _ => runtime_error("Called value is not a function"),
                 }
@@ -257,7 +276,7 @@ impl<'a> TreeWalk<'a> {
         &mut self,
         receiver: Value,
         method_name: &str,
-        arg_nodes: &Vec<Box<ASTNode>>,
+        arg_nodes: &[Box<ASTNode>],
     ) -> Value {
         let args: Vec<Value> = arg_nodes
             .iter()
@@ -266,9 +285,11 @@ impl<'a> TreeWalk<'a> {
 
         let string_methods = string_methods();
         let number_methods = number_methods();
+        let array_methods = array_methods();
         let method = match &receiver {
             Value::String(_) => string_methods.get(method_name),
             Value::Number(_) => number_methods.get(method_name),
+            Value::Array(_) => array_methods.get(method_name),
             _ => None,
         };
 

@@ -11,6 +11,7 @@ pub enum ASTNode {
     Program(Vec<ASTNode>),
     Block(Vec<ASTNode>),
     ObjectLiteral(Vec<(String, ASTNode)>),
+    ArrayLiteral(Vec<ASTNode>),
     BinaryOp {
         left: Box<ASTNode>,
         op: TokenKind,
