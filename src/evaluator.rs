@@ -17,13 +17,14 @@ fn runtime_error(msg: &str) -> Value {
     panic!("Runtime error: {}", msg);
 }
 
-#[derive(Clone, PartialEq, Debug, PartialOrd)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
     String(String),
     Return(Box<Value>),
     Function(Vec<String>, ASTNode),
+    Object(HashMap<String, Value>),
     Null,
     Unit,
 }
@@ -45,6 +46,7 @@ impl Value {
             Value::Function(_, _) => println!("Function"),
             Value::Return(val) => val.print(),
             Value::Null => println!("null"),
+            Value::Object(_) => println!("Object"),
             Value::Unit => (),
         }
     }
@@ -108,6 +110,13 @@ impl<'a> TreeWalk<'a> {
         match node {
             ASTNode::NumberLiteral(n) => Value::Number(*n),
             //ASTNode::BooleanLiteral(b) => Value::Boolean(*b),
+            ASTNode::ObjectLiteral(properties) => {
+                let mut obj = HashMap::new();
+                for (key, val) in properties {
+                    obj.insert(key.clone(), self.evaluate_node(val));
+                }
+                Value::Object(obj)
+            }
             ASTNode::StringLiteral(s) => Value::String(s.clone()),
             ASTNode::Variable(name) => self
                 .global_environment
@@ -122,6 +131,16 @@ impl<'a> TreeWalk<'a> {
             ASTNode::Expression(expr) => self.evaluate_node(expr),
             ASTNode::BinaryOp { left, op, right } => self.evaluate_binary_op(op, left, right),
             ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
+            ASTNode::MemberAccess { object, member } => {
+                let obj_val = self.evaluate_node(object);
+                if let Value::Object(properties) = obj_val {
+                    properties.get(member).cloned().unwrap_or_else(|| {
+                        runtime_error(&format!("Property '{}' not found", member))
+                    })
+                } else {
+                    runtime_error("Attempted member access on non-object value")
+                }
+            }
             ASTNode::Block(statements) => {
                 let mut result = Value::Unit;
                 for stmt in statements {
@@ -156,8 +175,12 @@ impl<'a> TreeWalk<'a> {
                 body,
             } => {
                 let func = Value::Function(parameters.clone(), *body.clone());
-                self.global_environment.insert(name.clone(), func);
-                Value::Unit
+
+                if name.is_some() {
+                    self.global_environment.insert(name.clone().unwrap(), func);
+                    return Value::Unit;
+                }
+                func
             }
             ASTNode::FunctionCall { callee, arguments } => {
                 let func = self.evaluate_node(callee);
@@ -194,92 +217,9 @@ impl<'a> TreeWalk<'a> {
                     _ => runtime_error("Called value is not a function"),
                 }
             }
+
             ASTNode::ReturnStatement(expr) => {
                 let val = self.evaluate_node(expr);
-                Value::Return(Box::new(val))
-            }
-            _ => runtime_error(format!("Unsupported AST node: {:?}", node).as_str()),
-        }
-    }
-
-    fn evaluate_node_with_scope(&mut self, node: &ASTNode, scope: &mut Scope) -> Value {
-        match node {
-            ASTNode::NumberLiteral(n) => Value::Number(*n),
-            //ASTNode::BooleanLiteral(b) => Value::Boolean(*b),
-            ASTNode::StringLiteral(s) => Value::String(s.clone()),
-            ASTNode::Variable(name) => scope
-                .get(name)
-                .cloned()
-                .unwrap_or_else(|| runtime_error(&format!("Undefined variable: {}", name))),
-            ASTNode::VariableDeclaration { name, value } => {
-                let val = self.evaluate_node_with_scope(value, scope);
-                scope.insert(name.clone(), val);
-                Value::Unit
-            }
-            ASTNode::BinaryOp { left, op, right } => self.evaluate_binary_op(op, left, right),
-            ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
-            ASTNode::Expression(expr) => self.evaluate_node_with_scope(expr, scope),
-            ASTNode::Block(statements) => {
-                let mut result = Value::Unit;
-                for stmt in statements {
-                    result = self.evaluate_node_with_scope(stmt, scope);
-                    if let Value::Return(_) = result {
-                        break;
-                    }
-                }
-                result
-            }
-            ASTNode::IfStatement {
-                condition,
-                consequence,
-                alternative,
-            } => {
-                let cond = self.evaluate_node_with_scope(condition, scope);
-                match cond {
-                    Value::Boolean(true) => self.evaluate_node_with_scope(consequence, scope),
-                    Value::Boolean(false) => {
-                        if let Some(alt) = alternative {
-                            self.evaluate_node_with_scope(alt, scope)
-                        } else {
-                            Value::Unit
-                        }
-                    }
-                    _ => runtime_error("Condition must be a boolean"),
-                }
-            }
-            ASTNode::FunctionDeclaration {
-                name,
-                parameters,
-                body,
-            } => {
-                let func = Value::Function(parameters.clone(), *body.clone());
-                scope.insert(name.clone(), func);
-                Value::Unit
-            }
-            ASTNode::FunctionCall { callee, arguments } => {
-                let func = self.evaluate_node_with_scope(callee, scope);
-                match func {
-                    Value::Function(params, body) => {
-                        if params.len() != arguments.len() {
-                            runtime_error("Argument count mismatch");
-                        }
-                        let mut local_scope = Scope::new(Some(Box::new(scope.clone())));
-                        for (param, arg) in params.iter().zip(arguments) {
-                            let arg_val = self.evaluate_node_with_scope(arg, scope);
-                            local_scope.insert(param.clone(), arg_val);
-                        }
-                        let result = self.evaluate_node_with_scope(&body, &mut local_scope);
-                        if let Value::Return(val) = result {
-                            *val
-                        } else {
-                            result
-                        }
-                    }
-                    _ => runtime_error("Called value is not a function"),
-                }
-            }
-            ASTNode::ReturnStatement(expr) => {
-                let val = self.evaluate_node_with_scope(expr, scope);
                 Value::Return(Box::new(val))
             }
             _ => runtime_error(format!("Unsupported AST node: {:?}", node).as_str()),

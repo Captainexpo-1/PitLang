@@ -29,6 +29,8 @@ pub enum TokenKind {
     SemiColon,
     NewLine,
     Comma,
+    Dot,
+    Colon,
     EOF,
 }
 
@@ -155,6 +157,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
                 tokens.push(Token::new(TokenKind::SemiColon, ";".to_string()));
                 chars.next();
             }
+            ':' => {
+                tokens.push(Token::new(TokenKind::Colon, ":".to_string()));
+                chars.next();
+            }
             ',' => {
                 tokens.push(Token::new(TokenKind::Comma, ",".to_string()));
                 chars.next();
@@ -184,6 +190,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
                 }
                 chars.next();
                 tokens.push(Token::new(TokenKind::String, value));
+            }
+            '.' => {
+                chars.next();
+                tokens.push(Token::new(TokenKind::Dot, ".".to_string()));
             }
             _ => {
                 let mut value = String::new();

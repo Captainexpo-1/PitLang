@@ -29,9 +29,13 @@ impl<'a> Parser<'a> {
         match token.kind {
             TokenKind::Let => self.parse_variable_declaration(),
             TokenKind::If => self.parse_if_statement(),
-            TokenKind::Function => self.parse_function_declaration(),
+            TokenKind::Function => self.parse_function_declaration(true),
             TokenKind::Return => self.parse_return_statement(),
-            TokenKind::LBrace => self.parse_block(),
+            //TokenKind::LBrace => self.parse_block(),
+            TokenKind::SemiColon => {
+                self.advance();
+                self.parse_statement()
+            }
             _ => {
                 let expr = self.parse_expression(0);
                 if self.tokens[self.current].kind == TokenKind::SemiColon {
@@ -67,9 +71,15 @@ impl<'a> Parser<'a> {
         ASTNode::ReturnStatement(Box::new(returnee))
     }
 
-    fn parse_function_declaration(&mut self) -> ASTNode {
-        self.expect(TokenKind::Function);
-        let name = self.advance().value.clone();
+    fn parse_function_declaration(&mut self, not_anonymous: bool) -> ASTNode {
+        if not_anonymous {
+            self.expect(TokenKind::Function);
+        }
+        let name = if not_anonymous {
+            Some(self.advance().value.clone())
+        } else {
+            None
+        };
         let parameters = self.parse_parameters();
         let body = Box::new(self.parse_block());
         ASTNode::FunctionDeclaration {
@@ -151,6 +161,13 @@ impl<'a> Parser<'a> {
                     arguments,
                 }
             }
+            TokenKind::Dot => {
+                let member = self.advance().value.clone();
+                ASTNode::MemberAccess {
+                    object: Box::new(left),
+                    member,
+                }
+            }
             _ => {
                 let right = self.parse_expression(precedence);
                 ASTNode::BinaryOp {
@@ -183,10 +200,37 @@ impl<'a> Parser<'a> {
             TokenKind::Number => ASTNode::NumberLiteral(token.value.parse().unwrap()),
             TokenKind::String => ASTNode::StringLiteral(token.value.clone()),
             TokenKind::Identifier => ASTNode::Variable(token.value.clone()),
+            TokenKind::Function => self.parse_function_declaration(false),
+
+            TokenKind::Dot => {
+                let member = self.advance().value.clone();
+                ASTNode::MemberAccess {
+                    object: Box::new(self.parse_nud()),
+                    member,
+                }
+            }
             TokenKind::LParen => {
                 let expr = self.parse_expression(0);
                 self.expect(TokenKind::RParen);
                 expr
+            }
+            TokenKind::LBrace => {
+                // Object literal
+                println!("Object literal");
+
+                let mut properties: Vec<(String, ASTNode)> = Vec::new();
+
+                while self.tokens[self.current].kind != TokenKind::RBrace {
+                    let key = self.advance().value.clone();
+                    self.expect(TokenKind::Colon);
+                    let value = self.parse_expression(0);
+                    properties.push((key, value));
+                    if self.tokens[self.current].kind == TokenKind::Comma {
+                        self.advance();
+                    }
+                }
+                self.expect(TokenKind::RBrace);
+                ASTNode::ObjectLiteral(properties)
             }
             TokenKind::Minus => ASTNode::UnaryOp {
                 op: token.kind,
@@ -208,7 +252,8 @@ impl<'a> Parser<'a> {
             TokenKind::GreaterEqual | TokenKind::LessEqual => 2,
             TokenKind::Plus | TokenKind::Minus => 2,
             TokenKind::Star | TokenKind::Slash => 3,
-            TokenKind::LParen => 4, // Added higher precedence for function calls
+            TokenKind::LParen => 4, // For function calls
+            TokenKind::Dot => 5,    // For member access
             _ => 0,
         }
     }

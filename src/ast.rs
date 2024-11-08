@@ -8,6 +8,7 @@ pub enum ASTNode {
     Variable(String),
     Program(Vec<ASTNode>),
     Block(Vec<ASTNode>),
+    ObjectLiteral(Vec<(String, ASTNode)>),
     BinaryOp {
         left: Box<ASTNode>,
         op: TokenKind,
@@ -31,9 +32,13 @@ pub enum ASTNode {
         arguments: Vec<ASTNode>,
     },
     FunctionDeclaration {
-        name: String,
+        name: Option<String>,
         parameters: Vec<String>,
         body: Box<ASTNode>,
     },
     ReturnStatement(Box<ASTNode>),
+    MemberAccess {
+        object: Box<ASTNode>,
+        member: String,
+    },
 }
