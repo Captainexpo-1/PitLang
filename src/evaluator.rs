@@ -22,7 +22,8 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     String(String),
-    Function(Vec<String>, ASTNode), // Params and function body
+    Return(Box<Value>),
+    Function(Vec<String>, ASTNode),
     Null,
     Unit,
 }
@@ -42,6 +43,7 @@ impl Value {
             Value::Boolean(b) => println!("{}", b),
             Value::String(s) => println!("{}", s),
             Value::Function(_, _) => println!("Function"),
+            Value::Return(val) => val.print(),
             Value::Null => println!("null"),
             Value::Unit => (),
         }
@@ -95,6 +97,9 @@ impl<'a> TreeWalk<'a> {
         let mut result = Value::Unit;
         for stmt in self.program {
             result = self.evaluate_node(stmt);
+            if let Value::Return(val) = result {
+                return *val;
+            }
         }
         result
     }
@@ -118,10 +123,12 @@ impl<'a> TreeWalk<'a> {
             ASTNode::BinaryOp { left, op, right } => self.evaluate_binary_op(op, left, right),
             ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
             ASTNode::Block(statements) => {
-                let mut local_scope = Scope::new(Some(Box::new(self.global_environment.clone())));
                 let mut result = Value::Unit;
                 for stmt in statements {
-                    result = self.evaluate_node_with_scope(stmt, &mut local_scope);
+                    result = self.evaluate_node(stmt);
+                    if let Value::Return(_) = result {
+                        break;
+                    }
                 }
                 result
             }
@@ -178,12 +185,19 @@ impl<'a> TreeWalk<'a> {
                             std::mem::replace(&mut self.global_environment, local_scope);
                         let result = self.evaluate_node(&body);
                         self.global_environment = previous_env;
-                        result
+                        if let Value::Return(val) = result {
+                            *val
+                        } else {
+                            result
+                        }
                     }
                     _ => runtime_error("Called value is not a function"),
                 }
             }
-            ASTNode::ReturnStatement(expr) => self.evaluate_node(expr),
+            ASTNode::ReturnStatement(expr) => {
+                let val = self.evaluate_node(expr);
+                Value::Return(Box::new(val))
+            }
             _ => runtime_error(format!("Unsupported AST node: {:?}", node).as_str()),
         }
     }
@@ -206,10 +220,12 @@ impl<'a> TreeWalk<'a> {
             ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
             ASTNode::Expression(expr) => self.evaluate_node_with_scope(expr, scope),
             ASTNode::Block(statements) => {
-                let mut local_scope = Scope::new(Some(Box::new(scope.clone())));
                 let mut result = Value::Unit;
                 for stmt in statements {
-                    result = self.evaluate_node_with_scope(stmt, &mut local_scope);
+                    result = self.evaluate_node_with_scope(stmt, scope);
+                    if let Value::Return(_) = result {
+                        break;
+                    }
                 }
                 result
             }
@@ -252,19 +268,33 @@ impl<'a> TreeWalk<'a> {
                             let arg_val = self.evaluate_node_with_scope(arg, scope);
                             local_scope.insert(param.clone(), arg_val);
                         }
-                        self.evaluate_node_with_scope(&body, &mut local_scope)
+                        let result = self.evaluate_node_with_scope(&body, &mut local_scope);
+                        if let Value::Return(val) = result {
+                            *val
+                        } else {
+                            result
+                        }
                     }
                     _ => runtime_error("Called value is not a function"),
                 }
             }
-            ASTNode::ReturnStatement(expr) => self.evaluate_node_with_scope(expr, scope),
+            ASTNode::ReturnStatement(expr) => {
+                let val = self.evaluate_node_with_scope(expr, scope);
+                Value::Return(Box::new(val))
+            }
             _ => runtime_error(format!("Unsupported AST node: {:?}", node).as_str()),
         }
     }
 
     fn evaluate_binary_op(&mut self, op: &TokenKind, left: &ASTNode, right: &ASTNode) -> Value {
         let left_val = self.evaluate_node(left);
+        if let Value::Return(_) = left_val {
+            return left_val;
+        }
         let right_val = self.evaluate_node(right);
+        if let Value::Return(_) = right_val {
+            return right_val;
+        }
         match op {
             TokenKind::Plus => match (left_val, right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
@@ -317,6 +347,9 @@ impl<'a> TreeWalk<'a> {
 
     fn evaluate_unary_op(&mut self, op: &TokenKind, operand: &ASTNode) -> Value {
         let val = self.evaluate_node(operand);
+        if let Value::Return(_) = val {
+            return val;
+        }
         match op {
             TokenKind::Minus => match val {
                 Value::Number(n) => Value::Number(-n),

@@ -21,7 +21,7 @@ fn main() {
     env::set_var("RUST_BACKTRACE", "1");
 
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
+    if args.len() < 2 {
         println!("Usage: {} <file>", args[0]);
         return;
     }
@@ -30,12 +30,18 @@ fn main() {
     let contents = get_file_contents(file_path);
     let tokens = tokenizer::tokenize(contents);
 
-    for token in &tokens {
-        println!("{:?}", token);
+    
+    if args.contains(&String::from("-t")) {
+        for token in &tokens {
+            println!("{:?}", token);
+        }
+        return;
     }
 
     let ast = parser::parse(tokens.as_slice());
-    println!("{:?}", ast);
+    if args.contains(&String::from("-ast")) {
+        println!("{:?}", ast);
+    }
     evaluator::evaluate(&ast);
     //println!("{}", result);
 }

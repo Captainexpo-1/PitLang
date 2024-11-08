@@ -1,13 +1,8 @@
-let x = 11;
-let y = 4;
-
-fn fibonacci(n){
+fn fibb(n){
     if n <= 1 {
         return n;
     }
-    return fibonacci(n - 1) + fibonacci(n - 2);
+    return fibb(n-1) + fibb(n-2);
 }
 
-let z = fibonacci(x);
-
-print(z)
+print(fibb(20));
