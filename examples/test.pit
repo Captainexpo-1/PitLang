@@ -1,11 +1,36 @@
-fn fibonacci(n){
-    let f = [0, 1];
-    let k = 2;
-    while (k <= n){
-        f.push(f.get(k - 1) + f.get(k - 2));
-        k = k + 1;
+fn sieve(n){
+    let is_prime = [];
+    let i = 0;
+    while (i <= n){
+        is_prime.push(true);
+        i = i + 1;
     }
-    return f.get(n);
+
+    is_prime.set(0, false);
+    is_prime.set(1, false);
+
+    let p = 2;
+    while ((p * p) <= n){
+        if (is_prime.get(p)){
+            let multiple = p * p;
+            while (multiple <= n){
+                is_prime.set(multiple, false);
+                multiple = multiple + p;
+            }
+        }
+        p = p + 1;
+    }
+
+    let primes = [];
+    let num = 2;
+    while (num <= n){
+        if (is_prime.get(num)){
+            primes.push(num);
+        }
+        num = num + 1;
+    }
+    return primes;
 }
 
-print(fibonacci(2000));
+let primes_up_to_100 = sieve(100);
+print(primes_up_to_100);

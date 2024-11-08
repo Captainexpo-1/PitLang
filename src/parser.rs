@@ -273,7 +273,7 @@ impl<'a> Parser<'a> {
             TokenKind::Greater | TokenKind::Less => 2,
             TokenKind::GreaterEqual | TokenKind::LessEqual => 2,
             TokenKind::Plus | TokenKind::Minus => 2,
-            TokenKind::Star | TokenKind::Slash => 3,
+            TokenKind::Star | TokenKind::Slash | TokenKind::Mod => 3,
             TokenKind::LParen => 4, // For function calls
             TokenKind::Dot => 5,    // For member access
             _ => 0,

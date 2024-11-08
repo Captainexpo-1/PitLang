@@ -35,6 +35,7 @@ pub enum TokenKind {
     True,
     False,
     While,
+    Mod,
     EOF,
 }
 
@@ -51,7 +52,7 @@ impl Token {
 }
 
 fn is_identifier_char(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
+    c.is_alphabetic() || c == '_' || c.is_ascii_digit()
 }
 
 fn get_identifier(id: String) -> Token {
@@ -78,7 +79,7 @@ pub fn tokenize(text: String) -> Vec<Token> {
             '0'..='9' => {
                 let mut value = String::new();
                 while let Some(&c) = chars.peek() {
-                    if c.is_ascii_digit() {
+                    if c.is_ascii_digit() || c == '.' {
                         value.push(c);
                         chars.next();
                     } else {
@@ -101,6 +102,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
             }
             '/' => {
                 tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                chars.next();
+            }
+            '%' => {
+                tokens.push(Token::new(TokenKind::Mod, "%".to_string()));
                 chars.next();
             }
             '(' => {

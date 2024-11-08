@@ -377,6 +377,10 @@ impl<'a> TreeWalk<'a> {
                 }
                 _ => runtime_error("Left side of assignment must be a variable"),
             },
+            TokenKind::Mod => match (left_val, right_val) {
+                (Value::Number(a), Value::Number(b)) => Value::Number(a % b),
+                _ => runtime_error("Operands must be numbers"),
+            },
             _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
         }
     }

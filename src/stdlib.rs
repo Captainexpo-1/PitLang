@@ -48,6 +48,23 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
             runtime_error("`push` method called on non-array value")
         }
     });
+    methods.insert("set".to_string(), |this: &Value, args: Vec<Value>| {
+        if let Value::Array(a) = this {
+            if let Value::Number(i) = args[0] {
+                let i = i as usize;
+                if i < a.borrow().len() {
+                    a.borrow_mut()[i] = args[1].clone();
+                    Value::Null
+                } else {
+                    runtime_error("Index out of bounds")
+                }
+            } else {
+                runtime_error("Index must be a number")
+            }
+        } else {
+            runtime_error("`set` method called on non-array value")
+        }
+    });
     methods.insert("get".to_string(), |this: &Value, args: Vec<Value>| {
         if let Value::Array(a) = this {
             if let Value::Number(i) = args[0] {
