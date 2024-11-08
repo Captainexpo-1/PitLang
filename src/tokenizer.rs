@@ -34,6 +34,7 @@ pub enum TokenKind {
     Null,
     True,
     False,
+    While,
     EOF,
 }
 
@@ -63,6 +64,7 @@ fn get_identifier(id: String) -> Token {
         "null" => Token::new(TokenKind::Null, id),
         "true" => Token::new(TokenKind::True, id),
         "false" => Token::new(TokenKind::False, id),
+        "while" => Token::new(TokenKind::While, id),
         _ => Token::new(TokenKind::Identifier, id),
     }
 }

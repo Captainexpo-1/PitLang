@@ -217,6 +217,16 @@ impl<'a> TreeWalk<'a> {
                 }
                 func
             }
+            ASTNode::WhileStatement { condition, body } => {
+                let mut result = Value::Unit;
+                while self.evaluate_node(condition).is_truthy() {
+                    result = self.evaluate_node(body);
+                    if let Value::Return(_) = result {
+                        break;
+                    }
+                }
+                result
+            }
             ASTNode::FunctionCall { callee, arguments } => {
                 let func = self.evaluate_node(callee);
 

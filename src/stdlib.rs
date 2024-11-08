@@ -1,5 +1,4 @@
 use crate::evaluator::{runtime_error, Value};
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value;

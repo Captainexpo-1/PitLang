@@ -1,4 +1,11 @@
-let y = [1,2,3];
-y.push(5);
+fn fibonacci(n){
+    let f = [0, 1];
+    let k = 2;
+    while (k <= n){
+        f.push(f.get(k - 1) + f.get(k - 2));
+        k = k + 1;
+    }
+    return f.get(n);
+}
 
-print(y.length());
+print(fibonacci(2000));

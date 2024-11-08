@@ -32,6 +32,7 @@ impl<'a> Parser<'a> {
             TokenKind::Function => self.parse_function_declaration(true),
             TokenKind::Return => self.parse_return_statement(),
             TokenKind::LBrace => self.parse_block(),
+            TokenKind::While => self.parse_while_statement(),
             TokenKind::SemiColon => {
                 self.advance();
                 self.parse_statement()
@@ -45,6 +46,16 @@ impl<'a> Parser<'a> {
                     expr
                 }
             }
+        }
+    }
+
+    fn parse_while_statement(&mut self) -> ASTNode {
+        self.expect(TokenKind::While);
+        let condition = self.parse_expression(0);
+        let body = Box::new(self.parse_block());
+        ASTNode::WhileStatement {
+            condition: Box::new(condition),
+            body,
         }
     }
 
