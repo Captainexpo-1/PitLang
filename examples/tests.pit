@@ -1,7 +1,9 @@
-let x = 2;
+let x = {
+    a: fn (self) {
+        self.b = self.b + 1;
+    },
+    b: 3,
+};
 
-while (x < 1000000){
-    x = x + 1;
-}
 
-x;
+x.a(x);

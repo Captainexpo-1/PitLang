@@ -5,6 +5,40 @@ use std::collections::HashMap;
 use std::fmt::format;
 use std::rc::Rc;
 
+type EnvironmentRef = Rc<RefCell<Environment>>;
+
+#[derive(Debug, Clone)]
+struct Environment {
+    values: HashMap<String, Value>,
+    parent: Option<EnvironmentRef>,
+}
+
+impl Environment {
+    fn new(parent: Option<EnvironmentRef>) -> EnvironmentRef {
+        Rc::new(RefCell::new(Environment {
+            values: HashMap::new(),
+            parent,
+        }))
+    }
+
+    fn get(&self, name: &str) -> Option<Value> {
+        match self.values.get(name) {
+            Some(value) => Some(value.clone()),
+            None => {
+                if let Some(parent_env) = &self.parent {
+                    parent_env.borrow().get(name)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn set(&mut self, name: String, value: Value) {
+        self.values.insert(name, value);
+    }
+}
+
 #[derive(Debug)]
 pub struct VM {
     stack: Vec<Value>,               // Stack for values during execution
@@ -14,11 +48,10 @@ pub struct VM {
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
-    function: Rc<Function>,         // The function being executed
-    instruction_pointer: usize,     // The instruction pointer for this frame
-    locals: HashMap<String, Value>, // Local variables for this function
+    function: Rc<Function>,      // The function being executed
+    instruction_pointer: usize,  // The instruction pointer for this frame
+    environment: EnvironmentRef, // Environment for this function
 }
-
 impl Default for VM {
     fn default() -> Self {
         VM::new()
@@ -40,7 +73,7 @@ impl VM {
         self.call_stack.push(CallFrame {
             function: function.clone(),
             instruction_pointer: 0,
-            locals: HashMap::new(),
+            environment: Environment::new(None),
         });
 
         while let Some(frame) = self.call_stack.last_mut() {
@@ -57,7 +90,7 @@ impl VM {
 
         Ok(self.stack.pop().unwrap_or(Value::Unit))
     }
-
+    #[inline]
     fn pop_stack(&mut self) -> Value {
         self.stack
             .pop()
@@ -79,22 +112,23 @@ impl VM {
             }
             // Load a variable from local or global scope
             Bytecode::LoadVar(name) => {
-                if let Some(value) = self
-                    .call_stack
-                    .last()
-                    .and_then(|frame| frame.locals.get(&name))
-                    .or_else(|| self.globals.get(&name))
-                {
-                    self.stack.push(value.clone());
+                if let Some(frame) = self.call_stack.last() {
+                    if let Some(value) = frame.environment.borrow().get(&name) {
+                        self.stack.push(value);
+                    } else if let Some(value) = self.globals.get(&name).cloned() {
+                        self.stack.push(value);
+                    } else {
+                        return Err(format!("Variable {} not found", name));
+                    }
                 } else {
-                    return Err(format!("Variable {} not found", name));
+                    return Err("No call frame found".to_string());
                 }
             }
             // Store the top stack value into a variable
             Bytecode::StoreVar(name) => {
                 let value = self.pop_stack();
-                if let Some(frame) = self.call_stack.last_mut() {
-                    frame.locals.insert(name, value);
+                if let Some(frame) = self.call_stack.last() {
+                    frame.environment.borrow_mut().set(name, value);
                 } else {
                     self.globals.insert(name, value);
                 }
@@ -165,28 +199,43 @@ impl VM {
             }
             // Function call
             Bytecode::Call(arg_count) => {
-                // Pop the function from the stack
-                let function_value = self.pop_stack();
-
                 // Collect arguments from the stack
                 let mut args = Vec::with_capacity(arg_count);
                 for _ in 0..arg_count {
                     args.push(self.pop_stack());
                 }
+                // Pop the function from the stack
+                let function_value = self.pop_stack();
+
                 // Reverse arguments to maintain correct order
                 args.reverse();
 
                 // Check if the value is a function
                 if let Value::Function(func) = function_value {
-                    let mut frame = CallFrame {
+                    // Get the current frame's environment as the parent
+                    let parent_environment = self
+                        .call_stack
+                        .last()
+                        .map(|frame| frame.environment.clone());
+
+                    // Create a new environment with the parent
+                    let environment = Environment::new(parent_environment);
+
+                    // Set up parameters in the new environment
+                    {
+                        let mut env_mut = environment.borrow_mut();
+                        for (i, param) in func.parameters.iter().enumerate() {
+                            let arg = args.get(i).cloned().unwrap_or(Value::Null);
+                            env_mut.set(param.clone(), arg);
+                        }
+                    }
+
+                    // Create the new call frame
+                    let frame = CallFrame {
                         function: func.clone(),
                         instruction_pointer: 0,
-                        locals: HashMap::new(),
+                        environment,
                     };
-                    for (i, param) in func.parameters.iter().enumerate() {
-                        let arg = args.get(i).cloned().unwrap_or(Value::Null);
-                        frame.locals.insert(param.clone(), arg);
-                    }
                     self.call_stack.push(frame);
                 } else {
                     return Err(format!(
@@ -201,8 +250,30 @@ impl VM {
                 self.call_stack.pop();
                 self.stack.push(return_value);
             }
-            // Handle other Bytecode variants if necessary
-
+            Bytecode::GetProp(property) => {
+                let object = self.pop_stack();
+                match object {
+                    Value::Object(obj) => {
+                        let obj = obj.borrow();
+                        if let Some(value) = obj.get(&property) {
+                            self.stack.push(value.clone());
+                        } else {
+                            return Err(format!("Property {} not found", property));
+                        }
+                    }
+                    _ => return Err("Value is not an object".to_string()),
+                }
+            }
+            Bytecode::SetProp(property) => {
+                let value = self.pop_stack();
+                let object = self.pop_stack();
+                match object {
+                    Value::Object(obj) => {
+                        obj.borrow_mut().insert(property, value);
+                    }
+                    _ => return Err("Value is not an object".to_string()),
+                }
+            }
             // Unknown instruction handling
             _ => return Err(format!("Unknown instruction: {:?}", instruction)),
         }
