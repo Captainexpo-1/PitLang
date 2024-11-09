@@ -1,4 +1,5 @@
-use crate::evaluator::{runtime_error, Value};
+use crate::common::Value;
+use crate::treewalk::evaluator::runtime_error;
 use std::collections::HashMap;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value;

@@ -3,9 +3,9 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 
 //use strungs::evaluator;
-use strungs::evaluator;
 use strungs::parser;
 use strungs::tokenizer;
+use strungs::treewalk::evaluator;
 
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
@@ -30,7 +30,6 @@ fn main() {
     let contents = get_file_contents(file_path);
     let tokens = tokenizer::tokenize(contents);
 
-    
     if args.contains(&String::from("-t")) {
         for token in &tokens {
             println!("{:?}", token);
@@ -43,5 +42,6 @@ fn main() {
         println!("{:?}", ast);
     }
     evaluator::evaluate(&ast);
+
     //println!("{}", result);
 }

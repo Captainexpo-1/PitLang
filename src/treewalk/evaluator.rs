@@ -1,4 +1,5 @@
 use crate::ast::ASTNode;
+use crate::common::Value;
 use crate::stdlib::{array_methods, number_methods, string_methods};
 use crate::tokenizer::TokenKind;
 use std::cell::RefCell;
@@ -18,62 +19,6 @@ pub fn evaluate(program: &ASTNode) -> Value {
 
 pub fn runtime_error(msg: &str) -> Value {
     panic!("Runtime error: {}", msg);
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum Value {
-    Number(f64),
-    Boolean(bool),
-    String(String),
-    Return(Box<Value>),
-    Array(Rc<RefCell<Vec<Value>>>),
-    Function(Vec<String>, ASTNode),
-    Object(Rc<RefCell<HashMap<String, Value>>>),
-    Method {
-        receiver: Box<Value>,
-        method_name: String,
-    },
-    Null,
-    Unit,
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Boolean(b) => *b,
-            Value::Number(n) => *n != 0.0,
-            Value::String(s) => !s.is_empty(),
-            _ => false,
-        }
-    }
-    pub fn print(&self) {
-        match self {
-            Value::Number(n) => print!("{}", n),
-            Value::Boolean(b) => print!("{}", b),
-            Value::String(s) => print!("{}", s),
-            Value::Function(_, _) => print!("Function"),
-            Value::Return(val) => val.print(),
-            Value::Null => print!("null"),
-            Value::Object(_) => print!("Object"),
-            Value::Array(values) => {
-                print!("[");
-                for (i, val) in values.borrow().iter().enumerate() {
-                    val.print();
-                    if i < values.borrow().len() - 1 {
-                        print!(", ");
-                    }
-                }
-                print!("]");
-            }
-            Value::Method {
-                receiver,
-                method_name,
-            } => {
-                print!("Method: {:.?}.{}", receiver, method_name)
-            }
-            Value::Unit => (),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -209,7 +154,7 @@ impl<'a> TreeWalk<'a> {
                 parameters,
                 body,
             } => {
-                let func = Value::Function(parameters.clone(), *body.clone());
+                let func = Value::Function_dep(parameters.clone(), *body.clone());
 
                 if name.is_some() {
                     self.global_environment.insert(name.clone().unwrap(), func);
@@ -240,7 +185,7 @@ impl<'a> TreeWalk<'a> {
                 };
 
                 match func {
-                    Value::Function(params, body) => {
+                    Value::Function_dep(params, body) => {
                         if params.len() != arguments.len() {
                             runtime_error("Argument count mismatch");
                         }
