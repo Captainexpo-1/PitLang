@@ -155,10 +155,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
                         tokens.push(Token::new(TokenKind::LessEqual, "<=".to_string()));
                         chars.next();
                     } else {
-                        tokens.push(Token::new(TokenKind::Assign, "<=".to_string()));
+                        tokens.push(Token::new(TokenKind::Less, "<".to_string()));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Assign, "<=".to_string()));
+                    tokens.push(Token::new(TokenKind::Less, "<".to_string()));
                 }
             }
             '>' => {

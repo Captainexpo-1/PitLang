@@ -145,7 +145,9 @@ impl<'a> Parser<'a> {
     fn parse_expression(&mut self, precedence: u8) -> ASTNode {
         let mut left = self.parse_nud();
 
-        while self.current < self.tokens.len() && precedence < self.get_precedence() {
+        while self.current < self.tokens.len()
+            && precedence < self.get_operator_precedence(&self.tokens[self.current].kind)
+        {
             left = self.parse_led(left);
         }
 
@@ -154,7 +156,7 @@ impl<'a> Parser<'a> {
 
     fn parse_led(&mut self, left: ASTNode) -> ASTNode {
         let token = self.advance().clone();
-        let precedence = self.get_precedence();
+        let precedence = self.get_operator_precedence(&token.kind);
 
         match token.kind {
             TokenKind::Assign => {
@@ -266,16 +268,18 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn get_precedence(&self) -> u8 {
-        match self.tokens[self.current].kind {
+    fn get_operator_precedence(&self, kind: &TokenKind) -> u8 {
+        match kind {
             TokenKind::Assign => 1,
-            TokenKind::Equal | TokenKind::NotEqual => 2,
-            TokenKind::Greater | TokenKind::Less => 2,
-            TokenKind::GreaterEqual | TokenKind::LessEqual => 2,
-            TokenKind::Plus | TokenKind::Minus => 2,
-            TokenKind::Star | TokenKind::Slash | TokenKind::Mod => 3,
-            TokenKind::LParen => 4, // For function calls
-            TokenKind::Dot => 5,    // For member access
+            TokenKind::Equal | TokenKind::NotEqual => 4,
+            TokenKind::Less
+            | TokenKind::LessEqual
+            | TokenKind::Greater
+            | TokenKind::GreaterEqual => 6,
+            TokenKind::Plus | TokenKind::Minus => 5,
+            TokenKind::Star | TokenKind::Slash => 7,
+            TokenKind::LParen => 9,
+            TokenKind::Dot => 10,
             _ => 0,
         }
     }
