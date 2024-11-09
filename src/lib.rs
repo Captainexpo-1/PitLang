@@ -9,6 +9,7 @@ pub mod tokenizer;
 
 pub mod virtualmachine {
     pub mod bytecode;
+    pub mod codegen;
     pub mod virtualmachine;
 }
 

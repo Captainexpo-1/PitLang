@@ -32,5 +32,5 @@ fn sieve(n){
     return primes;
 }
 
-let primes_up_to_100 = sieve(10000000);
+let primes_up_to_100 = sieve(10000);
 print(primes_up_to_100);

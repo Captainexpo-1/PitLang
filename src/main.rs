@@ -1,12 +1,16 @@
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::rc::Rc;
 
+use strungs::common::{Function, Value};
 //use strungs::evaluator;
 use strungs::parser;
 use strungs::tokenizer;
 use strungs::treewalk::evaluator;
-
+use strungs::virtualmachine::bytecode::{dump_bytecode, Bytecode};
+use strungs::virtualmachine::codegen::CodeGenerator;
+use strungs::virtualmachine::virtualmachine::VM;
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
     let mut buf_reader = BufReader::new(file);
@@ -41,7 +45,28 @@ fn main() {
     if args.contains(&String::from("-ast")) {
         println!("{:?}", ast);
     }
-    evaluator::evaluate(&ast);
+    if args.contains(&String::from("-eval")) {
+        evaluator::evaluate(&ast);
+    }
+    if args.contains(&String::from("-vm")) {
+        let mut codegen = CodeGenerator::new();
+        let bytecode = codegen.generate_bytecode(&ast);
+        if args.contains(&String::from("-d")) {
+            dump_bytecode(&bytecode.0, &bytecode.1, "bytecode.txt");
+        }
+        // Create a VM instance
+        let mut vm = VM::new();
 
+        let main_function = Rc::new(Function {
+            instructions: bytecode.0,
+            constants: bytecode.1,
+            parameters: vec![],
+            name: Some("main".to_string()),
+        });
+
+        // Run the main function in the VM
+        let result = vm.run(main_function);
+        println!("{:?}", result);
+    }
     //println!("{}", result);
 }

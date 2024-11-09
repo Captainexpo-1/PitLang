@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::ASTNode;
+use crate::virtualmachine::bytecode::Bytecode;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
@@ -65,52 +66,8 @@ impl Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    pub instructions: Vec<Instruction>,
+    pub instructions: Vec<Bytecode>,
     pub constants: Vec<Value>,
     pub parameters: Vec<String>,
     pub name: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Instruction {
-    // Stack manipulation
-    LoadConst(usize), // Push constant at constants[usize] onto the stack
-    LoadNull,         // Push Null onto the stack
-    Pop,              // Pop the top value from the stack
-
-    // Variables
-    LoadGlobal(String),  // Load global variable onto the stack
-    StoreGlobal(String), // Store top of stack into global variable
-
-    // Arithmetic operations
-    Add, // Add top two values on the stack
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-
-    // Comparison operations
-    Equal,
-    NotEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
-
-    // Logical operations
-    And,
-    Or,
-    Not,
-
-    // Control flow
-    Jump(usize),        // Jump to instruction index
-    JumpIfFalse(usize), // Jump if top of stack is false
-    JumpIfTrue(usize),  // Jump if top of stack is true
-
-    // Functions
-    Call(usize), // Call function with given number of arguments
-    Return,      // Return from function
-
-    // Miscellaneous
-    Print, // Print the top value on the stack
 }
