@@ -3,14 +3,14 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::rc::Rc;
 
-use strungs::common::{Function, Value};
-//use strungs::evaluator;
-use strungs::parser;
-use strungs::tokenizer;
-use strungs::treewalk::evaluator;
-use strungs::virtualmachine::bytecode::{dump_bytecode, Bytecode};
-use strungs::virtualmachine::codegen::CodeGenerator;
-use strungs::virtualmachine::virtualmachine::VM;
+use pitlang::common::Function;
+use pitlang::parser;
+use pitlang::tokenizer;
+use pitlang::treewalk::evaluator;
+use pitlang::virtualmachine::bytecode::dump_bytecode;
+use pitlang::virtualmachine::codegen::CodeGenerator;
+use pitlang::virtualmachine::virtualmachine::VM;
+
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
     let mut buf_reader = BufReader::new(file);

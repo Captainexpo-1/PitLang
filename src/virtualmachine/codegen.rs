@@ -7,7 +7,7 @@ use crate::common::{Function, Value};
 use crate::tokenizer::TokenKind;
 use crate::virtualmachine::bytecode::Bytecode;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct CodeGenerator {
     bytecode: Vec<Bytecode>,
     constants: Vec<Value>,

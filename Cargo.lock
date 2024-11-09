@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "strungs"
+name = "pitlang"
 version = "0.1.0"

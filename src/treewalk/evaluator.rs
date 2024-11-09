@@ -1,7 +1,7 @@
 use crate::ast::ASTNode;
 use crate::common::Value;
-use crate::stdlib::{array_methods, number_methods, string_methods};
 use crate::tokenizer::TokenKind;
+use crate::treewalk::stdlib::{array_methods, number_methods, string_methods};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

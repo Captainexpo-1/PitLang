@@ -1,8 +1,9 @@
 use crate::common::{Function, Value};
 use crate::virtualmachine::bytecode::Bytecode;
+use crate::virtualmachine::stdlib;
+use crate::virtualmachine::stdlib::std_lib;
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fmt::format;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 type EnvironmentRef = Rc<RefCell<Environment>>;
@@ -59,7 +60,7 @@ impl Default for VM {
 }
 
 impl VM {
-    /// Creates a new VM with an empty stack and no global variables.
+    // Creates a new VM with an empty stack and no global variables.
     pub fn new() -> Self {
         VM {
             stack: Vec::new(),
@@ -68,7 +69,7 @@ impl VM {
         }
     }
 
-    /// Executes a function by setting up a new call frame and running its instructions.
+    // Executes a function by setting up a new call frame and running its instructions.
     pub fn run(&mut self, function: Rc<Function>) -> Result<Value, String> {
         self.call_stack.push(CallFrame {
             function: function.clone(),
@@ -90,6 +91,14 @@ impl VM {
 
         Ok(self.stack.pop().unwrap_or(Value::Unit))
     }
+
+    pub fn run_stdlib_function(&mut self, function: String, args: Vec<Value>) -> Option<Value> {
+        if !std_lib().contains_key(function.as_str()) {
+            return None;
+        }
+        Some(std_lib()[function.as_str()](&Value::Null, args))
+    }
+
     #[inline]
     fn pop_stack(&mut self) -> Value {
         self.stack
@@ -117,8 +126,15 @@ impl VM {
                         self.stack.push(value);
                     } else if let Some(value) = self.globals.get(&name).cloned() {
                         self.stack.push(value);
+                    } else if std_lib().contains_key(name.as_str()) {
+                        self.stack.push(Value::Function(Rc::new(Function {
+                            instructions: vec![],
+                            constants: vec![],
+                            parameters: vec![],
+                            name: Some(name.clone()),
+                        })));
                     } else {
-                        return Err(format!("Variable {} not found", name));
+                        return Err(format!("Variable {} not found during LoadVar", name));
                     }
                 } else {
                     return Err("No call frame found".to_string());
@@ -153,6 +169,11 @@ impl VM {
                 let b = self.pop_stack();
                 let a = self.pop_stack();
                 self.stack.push(self.div_values(a, b)?);
+            }
+            Bytecode::Mod => {
+                let b = self.pop_stack();
+                let a = self.pop_stack();
+                self.stack.push(self.mod_values(a, b)?);
             }
             // Comparison operations
             Bytecode::Eq => {
@@ -199,26 +220,30 @@ impl VM {
             }
             // Function call
             Bytecode::Call(arg_count) => {
-                // Collect arguments from the stack
                 let mut args = Vec::with_capacity(arg_count);
                 for _ in 0..arg_count {
                     args.push(self.pop_stack());
                 }
-                // Pop the function from the stack
+
                 let function_value = self.pop_stack();
 
-                // Reverse arguments to maintain correct order
                 args.reverse();
 
-                // Check if the value is a function
                 if let Value::Function(func) = function_value {
-                    // Get the current frame's environment as the parent
+                    if std_lib().contains_key(func.name.as_ref().unwrap().as_str()) {
+                        let return_value = self
+                            .run_stdlib_function(func.name.as_ref().unwrap().clone(), args.clone());
+                        if let Some(value) = return_value {
+                            self.stack.push(value);
+                            return Ok(());
+                        }
+                    }
+
                     let parent_environment = self
                         .call_stack
                         .last()
                         .map(|frame| frame.environment.clone());
 
-                    // Create a new environment with the parent
                     let environment = Environment::new(parent_environment);
 
                     // Set up parameters in the new environment
@@ -230,7 +255,6 @@ impl VM {
                         }
                     }
 
-                    // Create the new call frame
                     let frame = CallFrame {
                         function: func.clone(),
                         instruction_pointer: 0,
@@ -304,6 +328,12 @@ impl VM {
         match (a, b) {
             (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x / y)),
             _ => Err("Type error in division".to_string()),
+        }
+    }
+    fn mod_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (a, b) {
+            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x % y)),
+            _ => Err("Type error in modulo".to_string()),
         }
     }
     fn lt_values(&self, a: Value, b: Value) -> Result<Value, String> {

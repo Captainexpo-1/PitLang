@@ -14,6 +14,7 @@ pub enum Bytecode {
     Sub, // Subtract two numbers on the stack
     Mul, // Multiply two numbers on the stack
     Div, // Divide two numbers on the stack
+    Mod, // Modulo two numbers on the stack
 
     // Logic operations
     Eq,      // Check if two values on the stack are equal
@@ -30,9 +31,6 @@ pub enum Bytecode {
     // Functions
     Call(usize), // Call a function with a certain number of arguments
     Return,      // Return from a function
-
-    // Built-in functions
-    CallNative(String, usize), // Call a native function with a name and arg count
 
     // Object and list manipulation
     GetProp(String), // Get a property from an object
@@ -52,5 +50,5 @@ pub fn dump_bytecode(bytecode: &[Bytecode], constants: &[Value], path: &str) {
         let t = format!("{:?}", constant);
         writeln!(file, "{:04} {}", i, t).unwrap();
     }
-    write!(file, "\n").unwrap();
+    writeln!(file).unwrap();
 }
