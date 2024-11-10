@@ -29,7 +29,7 @@ pub enum Bytecode {
     JumpIfFalse(usize), // Jump if the top stack value is false
 
     // Functions
-    Call(usize), // Call a function with a certain number of arguments
+    Call(usize), // Call a function with a certain number of arguments + a receiver (if applicable)
     Return,      // Return from a function
 
     // Object and list manipulation

@@ -174,8 +174,7 @@ impl CodeGenerator {
                         // Evaluate the receiver and push it onto the stack
                         self.generate_bytecode_inner(object);
 
-                        // Duplicate the receiver because GetProp consumes it
-                        self.bytecode.push(Bytecode::Duplicate);
+                        self.bytecode.push(Bytecode::Duplicate); // Duplicate the receiver
 
                         // Retrieve the method; stack after GetProp: [receiver, method]
                         self.bytecode.push(Bytecode::GetProp(member.clone()));
@@ -217,7 +216,6 @@ impl CodeGenerator {
             }
             ASTNode::MemberAccess { object, member } => {
                 self.generate_bytecode_inner(object);
-                let _index = self.add_constant(Value::String(member.clone()));
                 self.bytecode.push(Bytecode::GetProp(member.clone()));
             }
 

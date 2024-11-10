@@ -4,7 +4,6 @@ use crate::virtualmachine::stdlib::array_methods;
 use crate::virtualmachine::stdlib::std_lib;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::format;
 use std::rc::Rc;
 
 type EnvironmentRef = Rc<RefCell<Environment>>;
@@ -101,10 +100,15 @@ impl VM {
 
     #[inline]
     fn pop_stack(&mut self) -> Value {
-        self.stack.pop().unwrap()
+        let m = self.stack.pop();
+        if m.is_none() {
+            panic!("No value to pop from stack");
+        }
+        m.unwrap()
     }
 
     fn execute_instruction(&mut self, instruction: Bytecode) -> Result<(), String> {
+        //println!("{:?} {:?}", instruction, self.stack);
         match instruction {
             // Load a constant from the function's constant pool by index
             Bytecode::LoadConst(index) => {
@@ -224,7 +228,7 @@ impl VM {
                 }
 
                 let function_value = self.pop_stack();
-                let receiver = self.pop_stack();
+
                 args.reverse();
 
                 if let Value::Function(func) = function_value {
@@ -262,6 +266,7 @@ impl VM {
                     };
                     self.call_stack.push(frame);
                 } else if let Value::StdFunction(func) = function_value {
+                    let receiver = self.pop_stack();
                     let result = func(&receiver, args);
                     self.stack.push(result);
                 } else {
@@ -323,8 +328,6 @@ impl VM {
                 let value = self.stack.last().cloned().ok_or("No value to duplicate")?;
                 self.stack.push(value);
             }
-            // Unknown instruction handling
-            _ => return Err(format!("Unknown instruction: {:?}", instruction)),
         }
         Ok(())
     }

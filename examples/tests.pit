@@ -1,3 +1,8 @@
-let x = [1,2,3];
-x.set(1, "Hello world!");
-println(x);
+let x = {
+    b: 3 + 5,
+    a:fn (self) {
+        return self.b;
+    }
+};
+
+x.a(x);
