@@ -169,11 +169,34 @@ impl CodeGenerator {
                 }
             }
             ASTNode::FunctionCall { callee, arguments } => {
-                self.generate_bytecode_inner(callee);
-                for arg in arguments {
-                    self.generate_bytecode_inner(arg);
+                match &**callee {
+                    ASTNode::MemberAccess { object, member } => {
+                        // Evaluate the receiver and push it onto the stack
+                        self.generate_bytecode_inner(object);
+
+                        // Duplicate the receiver because GetProp consumes it
+                        self.bytecode.push(Bytecode::Duplicate);
+
+                        // Retrieve the method; stack after GetProp: [receiver, method]
+                        self.bytecode.push(Bytecode::GetProp(member.clone()));
+
+                        // Push the arguments onto the stack
+                        for arg in arguments {
+                            self.generate_bytecode_inner(arg);
+                        }
+
+                        // Call the method; arguments + receiver
+                        self.bytecode.push(Bytecode::Call(arguments.len()));
+                    }
+                    _ => {
+                        // Handle regular function calls
+                        self.generate_bytecode_inner(callee);
+                        for arg in arguments {
+                            self.generate_bytecode_inner(arg);
+                        }
+                        self.bytecode.push(Bytecode::Call(arguments.len()));
+                    }
                 }
-                self.bytecode.push(Bytecode::Call(arguments.len()));
             }
             ASTNode::ReturnStatement(expr) => {
                 self.generate_bytecode_inner(expr);
@@ -194,18 +217,15 @@ impl CodeGenerator {
             }
             ASTNode::MemberAccess { object, member } => {
                 self.generate_bytecode_inner(object);
-                let index = self.add_constant(Value::String(member.clone()));
+                let _index = self.add_constant(Value::String(member.clone()));
                 self.bytecode.push(Bytecode::GetProp(member.clone()));
             }
+
             ASTNode::ArrayLiteral(elements) => {
-                let mut arr: Vec<Value> = Vec::new();
                 for element in elements {
                     self.generate_bytecode_inner(element);
-                    let value_index = self.constants.len() - 1;
-                    arr.push(self.constants[value_index].clone());
                 }
-                let index = self.add_constant(Value::Array(Rc::new(RefCell::new(arr))));
-                self.bytecode.push(Bytecode::LoadConst(index));
+                self.bytecode.push(Bytecode::BuildArray(elements.len()));
             }
             _ => {
                 panic!("Unsupported AST node: {:?}", node);

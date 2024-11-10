@@ -11,8 +11,8 @@ pub mod tokenizer;
 pub mod virtualmachine {
     pub mod bytecode;
     pub mod codegen;
+    pub mod interpreter;
     pub mod stdlib;
-    pub mod virtualmachine;
 }
 
 pub mod common;

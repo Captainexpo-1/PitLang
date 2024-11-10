@@ -9,7 +9,7 @@ use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
 use pitlang::virtualmachine::bytecode::dump_bytecode;
 use pitlang::virtualmachine::codegen::CodeGenerator;
-use pitlang::virtualmachine::virtualmachine::VM;
+use pitlang::virtualmachine::interpreter::VM;
 
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
@@ -51,8 +51,9 @@ fn main() {
     if args.contains(&String::from("-vm")) {
         let mut codegen = CodeGenerator::new();
         let bytecode = codegen.generate_bytecode(&ast);
-        if args.contains(&String::from("-d")) {
-            dump_bytecode(&bytecode.0, &bytecode.1, "bytecode.txt");
+        // Find the -d flag
+        if let Some(d) = args.iter().position(|x| x == "-d") {
+            dump_bytecode(&bytecode.0, &bytecode.1, args[d + 1].as_str());
         }
         // Create a VM instance
         let mut vm = VM::new();

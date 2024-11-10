@@ -1,8 +1,6 @@
-use crate::common::{Function, Value};
+use crate::common::{StdMethod, Value};
 use crate::treewalk::evaluator::runtime_error;
 use std::collections::HashMap;
-
-pub type StdMethod = fn(&Value, Vec<Value>) -> Value; // Takes a receiver and arguments, returns a value
 
 pub fn std_lib() -> HashMap<&'static str, StdMethod> {
     let mut stdlib: HashMap<&'static str, StdMethod> = HashMap::new();
@@ -92,12 +90,12 @@ pub fn _number_to_string(_receiver: &Value, _args: Vec<Value>) -> Value {
 }
 
 // Array methods
-pub fn array_methods() -> HashMap<&'static str, StdMethod> {
-    let mut methods: HashMap<&'static str, StdMethod> = HashMap::new();
-    methods.insert("length", _array_length);
-    methods.insert("push", _array_push);
-    methods.insert("get", _array_get);
-    methods.insert("set", _array_set);
+pub fn array_methods() -> HashMap<&'static str, Value> {
+    let mut methods: HashMap<&'static str, Value> = HashMap::new();
+    methods.insert("length", Value::StdFunction(_array_length));
+    methods.insert("push", Value::StdFunction(_array_push));
+    methods.insert("get", Value::StdFunction(_array_get));
+    methods.insert("set", Value::StdFunction(_array_set));
     methods
 }
 

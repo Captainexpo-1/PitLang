@@ -5,6 +5,8 @@ use std::rc::Rc;
 use crate::ast::ASTNode;
 use crate::virtualmachine::bytecode::Bytecode;
 
+pub type StdMethod = fn(&Value, Vec<Value>) -> Value; // Takes a receiver and arguments, returns a value
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Number(f64),
@@ -12,8 +14,9 @@ pub enum Value {
     String(String),
     Return(Box<Value>),
     Array(Rc<RefCell<Vec<Value>>>),
-    Function_dep(Vec<String>, ASTNode),
+    _Function(Vec<String>, ASTNode),
     Function(Rc<Function>),
+    StdFunction(StdMethod),
     Object(Rc<RefCell<HashMap<String, Value>>>),
     Method {
         receiver: Box<Value>,
@@ -51,7 +54,7 @@ impl Value {
             }
             Value::Object(_) => print!("Object"),
             Value::Function(_) => print!("Function"),
-            Value::Function_dep(_, _) => print!("Function"),
+            Value::_Function(_, _) => print!("Function"),
             Value::Method {
                 receiver,
                 method_name,

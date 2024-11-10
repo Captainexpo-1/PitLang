@@ -33,10 +33,12 @@ pub enum Bytecode {
     Return,      // Return from a function
 
     // Object and list manipulation
-    GetProp(String), // Get a property from an object
-    SetProp(String), // Set a property on an object
-    Append,          // Append an item to a list
-    Index,           // Get an item at an index from a list
+    GetProp(String),   // Get a property from an object
+    SetProp(String),   // Set a property on an object
+    BuildArray(usize), // Build an array from the top n values on the stack
+
+    // Misc
+    Duplicate, // Duplicate the top value on the stack
 }
 
 pub fn dump_bytecode(bytecode: &[Bytecode], constants: &[Value], path: &str) {

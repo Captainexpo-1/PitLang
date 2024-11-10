@@ -154,7 +154,7 @@ impl<'a> TreeWalk<'a> {
                 parameters,
                 body,
             } => {
-                let func = Value::Function_dep(parameters.clone(), *body.clone());
+                let func = Value::_Function(parameters.clone(), *body.clone());
 
                 if name.is_some() {
                     self.global_environment.insert(name.clone().unwrap(), func);
@@ -185,7 +185,7 @@ impl<'a> TreeWalk<'a> {
                 };
 
                 match func {
-                    Value::Function_dep(params, body) => {
+                    Value::_Function(params, body) => {
                         if params.len() != arguments.len() {
                             runtime_error("Argument count mismatch");
                         }

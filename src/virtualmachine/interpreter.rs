@@ -1,9 +1,10 @@
 use crate::common::{Function, Value};
 use crate::virtualmachine::bytecode::Bytecode;
-use crate::virtualmachine::stdlib;
+use crate::virtualmachine::stdlib::array_methods;
 use crate::virtualmachine::stdlib::std_lib;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::fmt::format;
 use std::rc::Rc;
 
 type EnvironmentRef = Rc<RefCell<Environment>>;
@@ -23,16 +24,15 @@ impl Environment {
     }
 
     fn get(&self, name: &str) -> Option<Value> {
-        match self.values.get(name) {
-            Some(value) => Some(value.clone()),
-            None => {
-                if let Some(parent_env) = &self.parent {
-                    parent_env.borrow().get(name)
-                } else {
-                    None
-                }
+        // Iterate through the environment chain to find the value without recursion
+        let mut env = Some(Rc::new(RefCell::new(self.clone())));
+        while let Some(current) = env {
+            if let Some(value) = current.borrow().values.get(name) {
+                return Some(value.clone());
             }
+            env = current.borrow().parent.clone();
         }
+        None
     }
 
     fn set(&mut self, name: String, value: Value) {
@@ -101,9 +101,7 @@ impl VM {
 
     #[inline]
     fn pop_stack(&mut self) -> Value {
-        self.stack
-            .pop()
-            .unwrap_or_else(|| panic!("No value on the stack"))
+        self.stack.pop().unwrap()
     }
 
     fn execute_instruction(&mut self, instruction: Bytecode) -> Result<(), String> {
@@ -226,11 +224,13 @@ impl VM {
                 }
 
                 let function_value = self.pop_stack();
-
+                let receiver = self.pop_stack();
                 args.reverse();
 
                 if let Value::Function(func) = function_value {
-                    if std_lib().contains_key(func.name.as_ref().unwrap().as_str()) {
+                    if func.name.is_some()
+                        && std_lib().contains_key(func.name.as_ref().unwrap().as_str())
+                    {
                         let return_value = self
                             .run_stdlib_function(func.name.as_ref().unwrap().clone(), args.clone());
                         if let Some(value) = return_value {
@@ -261,6 +261,9 @@ impl VM {
                         environment,
                     };
                     self.call_stack.push(frame);
+                } else if let Value::StdFunction(func) = function_value {
+                    let result = func(&receiver, args);
+                    self.stack.push(result);
                 } else {
                     return Err(format!(
                         "Attempted to call a non-function: {:?}",
@@ -285,18 +288,40 @@ impl VM {
                             return Err(format!("Property {} not found", property));
                         }
                     }
-                    _ => return Err("Value is not an object".to_string()),
+                    Value::Array(_) => {
+                        let array_m = array_methods();
+                        if let Some(method) = array_m.get(property.as_str()) {
+                            self.stack.push(method.clone());
+                        } else {
+                            return Err(format!("Method {} not found", property));
+                        }
+                    }
+                    _ => return Err(format!("Value is not an object {:?}", object).to_string()),
                 }
             }
             Bytecode::SetProp(property) => {
                 let value = self.pop_stack();
                 let object = self.pop_stack();
+
                 match object {
                     Value::Object(obj) => {
                         obj.borrow_mut().insert(property, value);
                     }
                     _ => return Err("Value is not an object".to_string()),
                 }
+            }
+            Bytecode::BuildArray(count) => {
+                let mut elements = Vec::with_capacity(count);
+                for _ in 0..count {
+                    elements.push(self.pop_stack());
+                }
+                elements.reverse(); // Reverse to maintain the correct order
+                self.stack
+                    .push(Value::Array(Rc::new(RefCell::new(elements))));
+            }
+            Bytecode::Duplicate => {
+                let value = self.stack.last().cloned().ok_or("No value to duplicate")?;
+                self.stack.push(value);
             }
             // Unknown instruction handling
             _ => return Err(format!("Unknown instruction: {:?}", instruction)),
