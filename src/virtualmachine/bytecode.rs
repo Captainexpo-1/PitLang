@@ -10,33 +10,64 @@ pub struct Bytecode {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
-    PushConst(u16), // push const to stack from constant pool
+    // Stack Manipulation
+    PushConst(usize), // Push a constant from the constant pool onto the stack
+    Pop,              // Pop the top value off the stack
+    Dup,              // Duplicate the top value on the stack
 
-    Pop,  // pop value from stack
-    Dup,  // duplicate top value on stack
-    Swap, // swap top two values on stack
-
-    // Binary operations
-    Add,
-    Sub,
-    Mul,
-    Div,
+    // Arithmetic Operations
+    Add, // Add top two values on the stack (supports numbers and strings)
+    Sub, // Subtract top two values (numbers only)
+    Mul, // Multiply top two values (numbers only)
+    Div, // Divide top two values (numbers only)
     Mod,
+    Negate, // Negate the top value (unary minus for numbers)
 
-    Jmp(u16), // jump to instruction
-    Jit(u16), // jump if top of stack is true
-    Jif(u16), // jump if top of stack is false
+    // Comparison Operations
+    Eq, // Check equality of top two values
+    Ne, // Check inequality of top two values
+    Gt, // Greater than
+    Ge, // Greater than or equal to
+    Lt, // Less than
+    Le, // Less than or equal to
 
-    // Comparison operations
-    Eq,
-    Ne,
-    Gt,
-    Ge,
-    Lt,
-    Le,
+    // Logical Operations
+    Not, // Logical NOT for booleans
 
-    Return, // return from function and jump to return address on stack
-    Halt,   // halt execution
+    // Variable Operations
+    LoadLocal(usize),   // Load a local variable onto the stack
+    StoreLocal(usize),  // Store the top value in a local variable
+    LoadGlobal(usize),  // Load a global variable onto the stack
+    StoreGlobal(usize), // Store the top value in a global variable
+
+    // Control Flow
+    Jmp(usize),  // Unconditional jump to address
+    Jit(usize),  // Jump if top of stack is true
+    Jif(usize),  // Jump if top of stack is false
+    Call(usize), // Call function at address
+    Return,      // Return from function
+
+    // Type Inspection
+    TypeOf,      // Push the type of the top value as a string (e.g., "number", "string")
+    IsNull,      // Check if top of stack is null
+    IsUndefined, // Check if top of stack is undefined
+
+    // Object Manipulation
+    GetProperty(String), // Get a property from an Object (top of stack is the object)
+    SetProperty(String), // Set a property on an Object (top is value, second is object)
+
+    // Array Manipulation
+    ArrayPush,       // Push a value to an Array (top of stack is value, below is array)
+    ArrayPop,        // Pop a value from an Array (top of stack is the array)
+    ArrayGet(usize), // Get an element at index in an Array
+    ArraySet(usize), // Set an element at index in an Array
+
+    DEBUG_LABEL(String), // Debug label for debugging purposes
+
+    Swap,
+
+    // Program Termination
+    Halt, // Stop execution
 }
 
 pub fn dump_bytecode(code: &Bytecode, path: &str) {

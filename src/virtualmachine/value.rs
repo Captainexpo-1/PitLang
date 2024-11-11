@@ -1,7 +1,12 @@
 use crate::virtualmachine::bytecode::Instruction;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-pub type StdMethod = fn(&Value, Vec<Value>) -> Value; // Takes a receiver and arguments, returns a value
+#[derive(Debug, Clone)]
+pub struct CallFrame {
+    pub is_main: bool,         // Is this the main frame?
+    pub return_address: usize, // Address to jump back to after function call
+    pub locals: Vec<Value>,    // Local variables for this frame
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
@@ -15,7 +20,7 @@ pub enum Value {
     String(String),
     Object(Object),
     Array(Vec<Value>),
-    Function(usize), // Entry point in the instruction array
+    Function(FunctionMeta),
     Null,
     Undefined,
 }
@@ -48,11 +53,24 @@ impl Value {
                         s.push_str(", ");
                     }
                 }
-                s.push_str("]");
+                s.push(']');
                 s
             }
             Value::Object(_) => "Object".to_string(),
             Value::Function(_) => "Function".to_string(),
+        }
+    }
+
+    pub fn get_type(&self) -> String {
+        match self {
+            Value::Number(_) => "number".to_string(),
+            Value::Bool(_) => "boolean".to_string(),
+            Value::String(_) => "string".to_string(),
+            Value::Null => "null".to_string(),
+            Value::Undefined => "undefined".to_string(),
+            Value::Array(_) => "array".to_string(),
+            Value::Object(_) => "object".to_string(),
+            Value::Function(_) => "function".to_string(),
         }
     }
 
@@ -90,9 +108,7 @@ impl Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function {
-    pub instructions: Vec<Instruction>,
-    pub constants: Vec<Value>,
-    pub parameters: Vec<String>,
-    pub name: Option<String>,
+pub struct FunctionMeta {
+    pub address: usize,
+    pub arity: usize,
 }

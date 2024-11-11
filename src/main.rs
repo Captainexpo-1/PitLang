@@ -6,7 +6,7 @@ use std::rc::Rc;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
-use pitlang::virtualmachine::bytecode::Instruction;
+use pitlang::virtualmachine::bytecode::{self, Instruction};
 use pitlang::virtualmachine::bytecode::{dump_bytecode, Bytecode};
 use pitlang::virtualmachine::codegen::CodeGenerator;
 use pitlang::virtualmachine::interpreter::Interpreter;
@@ -50,30 +50,7 @@ fn main() {
         evaluator::evaluate(&ast);
     }
     if args.contains(&String::from("-vm")) {
-        let instructions = vec![
-            Instruction::PushConst(0),
-            Instruction::PushConst(1),
-            Instruction::Add,
-            Instruction::PushConst(2),
-            Instruction::Sub,
-            Instruction::PushConst(3),
-            Instruction::Mul,
-            Instruction::PushConst(4),
-            Instruction::Div,
-            Instruction::Halt,
-        ];
-        let constants = vec![
-            Value::Number(10.0),
-            Value::Number(5.0),
-            Value::Number(2.0),
-            Value::Number(3.0),
-            Value::Number(2.0),
-        ];
-
-        let bytecode = Bytecode {
-            instructions,
-            constants,
-        };
+        let bytecode = CodeGenerator::new().generate_bytecode(&ast);
 
         dump_bytecode(&bytecode, "../output/bytecode.txt");
 

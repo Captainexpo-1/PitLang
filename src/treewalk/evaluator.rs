@@ -6,6 +6,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use super::stdlib::std_methods;
+
 pub fn evaluate(program: &ASTNode) -> Value {
     let mut evaluator = TreeWalk::new(match program {
         ASTNode::Program(statements) => statements,
@@ -62,8 +64,14 @@ impl<'a> TreeWalk<'a> {
     }
 
     fn evaluate_program(&mut self) -> Value {
-        self.global_environment
-            .insert("print".to_string(), Value::Null);
+        let mut std_map = HashMap::new();
+        for method in std_methods() {
+            std_map.insert(method.0.to_string(), Value::StdFunction(method.1));
+        }
+        self.global_environment.insert(
+            "std".to_string(),
+            Value::Object(Rc::new(RefCell::new(std_map))),
+        );
 
         let mut result = Value::Unit;
         for stmt in self.program {
@@ -110,10 +118,16 @@ impl<'a> TreeWalk<'a> {
             ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
             ASTNode::MemberAccess { object, member } => {
                 let obj_val = self.evaluate_node(object);
+
                 if let Value::Object(properties) = obj_val {
-                    properties.borrow().get(member).cloned().unwrap_or_else(|| {
-                        runtime_error(&format!("Property '{}' not found", member))
-                    })
+                    let properties = properties.borrow();
+                    match properties.get(member) {
+                        Some(val) => val.clone(),
+                        None => runtime_error(&format!(
+                            "Property '{}' not found in object: {:?}",
+                            member, properties
+                        )),
+                    }
                 } else {
                     Value::Method {
                         receiver: Box::new(obj_val),
@@ -216,6 +230,13 @@ impl<'a> TreeWalk<'a> {
                             .map(|arg| Box::new(arg.clone()))
                             .collect::<Vec<_>>(),
                     ),
+                    Value::StdFunction(func) => {
+                        let args: Vec<Value> = arguments
+                            .iter()
+                            .map(|arg| self.evaluate_node(arg))
+                            .collect();
+                        func(&Value::Unit, args)
+                    }
                     _ => runtime_error("Called value is not a function"),
                 }
             }

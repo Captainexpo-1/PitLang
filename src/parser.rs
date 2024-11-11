@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
                 let expr = self.parse_expression(0);
                 if self.tokens[self.current].kind == TokenKind::SemiColon {
                     self.expect(TokenKind::SemiColon);
-                    ASTNode::Expression(Box::new(expr))
+                    expr
                 } else {
                     expr
                 }

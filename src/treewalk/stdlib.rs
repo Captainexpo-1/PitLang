@@ -3,7 +3,36 @@ use crate::treewalk::evaluator::runtime_error;
 use crate::treewalk::value::Value;
 use std::collections::HashMap;
 
+use rand::prelude::*;
+
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value;
+
+pub fn std_methods() -> HashMap<String, StdMethod> {
+    // For the included 'std' object, E.G. std.time()
+    let mut methods: HashMap<String, StdMethod> = HashMap::new();
+    methods.insert("time".to_string(), |_this: &Value, _args: Vec<Value>| {
+        Value::Number(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
+        )
+    });
+    methods.insert("random".to_string(), |_this: &Value, _args: Vec<Value>| {
+        Value::Number(rand::random::<f64>())
+    });
+    methods.insert("print".to_string(), |_this: &Value, args: Vec<Value>| {
+        for (i, arg) in args.iter().enumerate() {
+            arg.print();
+            if i < args.len() - 1 {
+                print!(" ");
+            }
+        }
+        println!();
+        Value::Null
+    });
+    methods
+}
 
 pub fn string_methods() -> HashMap<String, StdMethod> {
     let mut methods: HashMap<String, StdMethod> = HashMap::new();

@@ -1,9 +1,5 @@
 use crate::virtualmachine::bytecode::{Bytecode, Instruction};
-use crate::virtualmachine::value::Value;
-use std::collections::HashMap;
-use std::result;
-
-use super::bytecode;
+use crate::virtualmachine::value::{CallFrame, Value};
 
 const STACK_SIZE: usize = 1024;
 
@@ -13,8 +9,15 @@ pub struct Interpreter {
     instructions: Vec<Instruction>,
     constants: Vec<Value>,
     running: bool,
+    call_stack: Vec<CallFrame>,
     ip: usize,
     sp: usize,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Interpreter {
@@ -24,6 +27,7 @@ impl Interpreter {
             instructions: Vec::new(),
             constants: Vec::new(),
             running: false,
+            call_stack: Vec::new(),
             ip: 0,
             sp: 0,
         }
@@ -32,7 +36,11 @@ impl Interpreter {
     pub fn run(&mut self, bytecode: Bytecode) {
         (self.instructions, self.constants) = (bytecode.instructions, bytecode.constants);
         self.running = true;
-
+        self.call_stack.push(CallFrame {
+            is_main: true,
+            return_address: 0,
+            locals: Vec::new(),
+        });
         while self.running {
             self.execute_instruction();
         }
@@ -63,7 +71,7 @@ impl Interpreter {
         match *instruction {
             Instruction::Halt => self.running = false,
             Instruction::PushConst(index) => {
-                let constant = self.constants[index as usize].clone();
+                let constant = self.constants[index].clone();
                 self.push_stack(constant);
                 self.ip += 1;
             }
@@ -111,20 +119,13 @@ impl Interpreter {
                 self.pop_stack();
                 self.ip += 1;
             }
-            Instruction::Swap => {
-                let a = self.pop_stack();
-                let b = self.pop_stack();
-                self.push_stack(a);
-                self.push_stack(b);
-                self.ip += 1;
-            }
             Instruction::Jmp(offset) => {
-                self.ip = offset as usize;
+                self.ip = offset;
             }
             Instruction::Jit(offset) => {
                 let condition = self.pop_stack();
                 if condition.is_truthy() {
-                    self.ip = offset as usize;
+                    self.ip = offset;
                 } else {
                     self.ip += 1;
                 }
@@ -132,7 +133,7 @@ impl Interpreter {
             Instruction::Jif(offset) => {
                 let condition = self.pop_stack();
                 if !condition.is_truthy() {
-                    self.ip = offset as usize;
+                    self.ip = offset;
                 } else {
                     self.ip += 1;
                 }
@@ -179,19 +180,137 @@ impl Interpreter {
                 self.push_stack(result);
                 self.ip += 1;
             }
+            Instruction::Not => {
+                let value = self.pop_stack();
+                let result = Value::Bool(!value.is_truthy());
+                self.push_stack(result);
+                self.ip += 1;
+            }
             Instruction::Return => {
-                let return_address = self.pop_stack();
-                self.ip = match return_address {
-                    Value::Number(n) => n as usize,
+                // Return the function result to the caller
+                let result = self.pop_stack();
+
+                // Pop the current frame and restore the caller frame
+                let frame = self.call_stack.pop().unwrap();
+                if frame.is_main {
+                    self.running = false;
+                    return;
+                }
+                self.ip = frame.return_address;
+
+                // Push the result back on the stack for caller
+                self.push_stack(result);
+            }
+            Instruction::Call(func_index) => {
+                // Retrieve function metadata from constants
+                let func_meta = match &self.constants[func_index] {
+                    Value::Function(meta) => meta.clone(),
                     _ => {
-                        println!("Invalid return address");
+                        println!("Call to non-function value");
                         self.running = false;
-                        0
+                        return;
                     }
                 };
+
+                // Pop arguments from stack and prepare new CallFrame
+                let mut frame = CallFrame {
+                    is_main: false,
+                    return_address: self.ip + 1,
+                    locals: vec![Value::Null; func_meta.arity], // Initialize locals with argument space
+                };
+
+                // Store arguments in frame.locals
+                for i in (0..func_meta.arity).rev() {
+                    frame.locals[i] = self.pop_stack();
+                }
+
+                // Push the new frame and jump to function address
+                self.call_stack.push(frame);
+                self.ip = func_meta.address;
             }
+            Instruction::TypeOf => {
+                let value = self.pop_stack();
+                let result = Value::String(value.get_type());
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::IsNull => {
+                let value = self.pop_stack();
+                let result = Value::Bool(value == Value::Null);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::IsUndefined => {
+                let value = self.pop_stack();
+                let result = Value::Bool(value == Value::Undefined);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Swap => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                self.push_stack(a);
+                self.push_stack(b);
+                self.ip += 1;
+            }
+            Instruction::Negate => {
+                let value = self.pop_stack();
+                let result = match value {
+                    Value::Number(n) => Value::Number(-n),
+                    _ => {
+                        println!("Unsupported operand type for negation");
+                        Value::Null
+                    }
+                };
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Not => {
+                let value = self.pop_stack();
+                let result = match value {
+                    Value::Bool(b) => Value::Bool(!b),
+                    _ => {
+                        println!("Unsupported operand type for logical NOT");
+                        Value::Null
+                    }
+                };
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::StoreLocal(index) => {
+                println!("StoreLocal: {} {}", index, self.ip);
+                println!("Call stack: {:?}", self.call_stack);
+                let value = self.pop_stack();
+                if let Some(frame) = self.call_stack.last_mut() {
+                    // Resize locals if index is out of bounds
+                    if frame.locals.len() <= index {
+                        frame.locals.resize(index + 1, Value::Null);
+                    }
+                    frame.locals[index] = value;
+                } else {
+                    println!("No call frame available for StoreLocal");
+                    self.running = false;
+                }
+                self.ip += 1;
+            }
+            Instruction::LoadLocal(index) => {
+                if let Some(frame) = self.call_stack.last() {
+                    if let Some(value) = frame.locals.get(index) {
+                        self.push_stack(value.clone());
+                    } else {
+                        println!("Local variable index out of bounds");
+                        self.running = false;
+                    }
+                } else {
+                    println!("No call frame available for LoadLocal");
+                    self.running = false;
+                }
+                self.ip += 1;
+            }
+
+            Instruction::DEBUG_LABEL(_) => self.ip += 1,
             _ => {
-                println!("Unsupported instruction");
+                println!("Unsupported instruction {:?}", instruction);
                 self.running = false;
             }
         }
@@ -208,6 +327,7 @@ impl Interpreter {
     pub fn add_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
+            (Value::String(a), Value::String(b)) => Value::String(format!("{}{}", a, b)),
             _ => {
                 println!("Unsupported operand types for addition");
                 Value::Null
