@@ -1,7 +1,7 @@
 use crate::ast::ASTNode;
-use crate::common::Value;
 use crate::tokenizer::TokenKind;
 use crate::treewalk::stdlib::{array_methods, number_methods, string_methods};
+use crate::treewalk::value::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -154,7 +154,7 @@ impl<'a> TreeWalk<'a> {
                 parameters,
                 body,
             } => {
-                let func = Value::_Function(parameters.clone(), *body.clone());
+                let func = Value::Function(parameters.clone(), *body.clone());
 
                 if name.is_some() {
                     self.global_environment.insert(name.clone().unwrap(), func);
@@ -185,7 +185,7 @@ impl<'a> TreeWalk<'a> {
                 };
 
                 match func {
-                    Value::_Function(params, body) => {
+                    Value::Function(params, body) => {
                         if params.len() != arguments.len() {
                             runtime_error("Argument count mismatch");
                         }

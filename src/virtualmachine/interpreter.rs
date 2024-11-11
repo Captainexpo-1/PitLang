@@ -1,391 +1,253 @@
-use crate::common::{Function, Value};
-use crate::virtualmachine::bytecode::Bytecode;
-use crate::virtualmachine::stdlib::array_methods;
-use crate::virtualmachine::stdlib::std_lib;
-use std::cell::RefCell;
+use crate::virtualmachine::bytecode::{Bytecode, Instruction};
+use crate::virtualmachine::value::Value;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::result;
 
-type EnvironmentRef = Rc<RefCell<Environment>>;
+use super::bytecode;
 
-#[derive(Debug, Clone)]
-struct Environment {
-    values: HashMap<String, Value>,
-    parent: Option<EnvironmentRef>,
-}
-
-impl Environment {
-    fn new(parent: Option<EnvironmentRef>) -> EnvironmentRef {
-        Rc::new(RefCell::new(Environment {
-            values: HashMap::new(),
-            parent,
-        }))
-    }
-
-    fn get(&self, name: &str) -> Option<Value> {
-        // Iterate through the environment chain to find the value without recursion
-        let mut env = Some(Rc::new(RefCell::new(self.clone())));
-        while let Some(current) = env {
-            if let Some(value) = current.borrow().values.get(name) {
-                return Some(value.clone());
-            }
-            env = current.borrow().parent.clone();
-        }
-        None
-    }
-
-    fn set(&mut self, name: String, value: Value) {
-        self.values.insert(name, value);
-    }
-}
+const STACK_SIZE: usize = 1024;
 
 #[derive(Debug)]
-pub struct VM {
-    stack: Vec<Value>,               // Stack for values during execution
-    globals: HashMap<String, Value>, // Global variables
-    call_stack: Vec<CallFrame>,      // Stack to keep track of function calls
+pub struct Interpreter {
+    stack: Vec<Value>,
+    instructions: Vec<Instruction>,
+    constants: Vec<Value>,
+    running: bool,
+    ip: usize,
+    sp: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct CallFrame {
-    function: Rc<Function>,      // The function being executed
-    instruction_pointer: usize,  // The instruction pointer for this frame
-    environment: EnvironmentRef, // Environment for this function
-}
-impl Default for VM {
-    fn default() -> Self {
-        VM::new()
-    }
-}
-
-impl VM {
-    // Creates a new VM with an empty stack and no global variables.
+impl Interpreter {
     pub fn new() -> Self {
-        VM {
-            stack: Vec::new(),
-            globals: HashMap::new(),
-            call_stack: Vec::new(),
+        Interpreter {
+            stack: Vec::with_capacity(STACK_SIZE),
+            instructions: Vec::new(),
+            constants: Vec::new(),
+            running: false,
+            ip: 0,
+            sp: 0,
         }
     }
 
-    // Executes a function by setting up a new call frame and running its instructions.
-    pub fn run(&mut self, function: Rc<Function>) -> Result<Value, String> {
-        self.call_stack.push(CallFrame {
-            function: function.clone(),
-            instruction_pointer: 0,
-            environment: Environment::new(None),
-        });
+    pub fn run(&mut self, bytecode: Bytecode) {
+        (self.instructions, self.constants) = (bytecode.instructions, bytecode.constants);
+        self.running = true;
 
-        while let Some(frame) = self.call_stack.last_mut() {
-            // Fetch the next instruction and execute it
-            if frame.instruction_pointer >= frame.function.instructions.len() {
-                self.call_stack.pop();
-                break;
+        while self.running {
+            self.execute_instruction();
+        }
+    }
+
+    pub fn push_stack(&mut self, value: Value) {
+        self.stack.push(value);
+        self.sp += 1;
+    }
+
+    pub fn pop_stack(&mut self) -> Value {
+        if self.sp == 0 {
+            println!("Stack underflow");
+            self.running = false;
+            return Value::Null;
+        }
+        self.sp -= 1;
+        self.stack.pop().unwrap()
+    }
+
+    pub fn cur_instruction(&self) -> &Instruction {
+        &self.instructions[self.ip]
+    }
+
+    pub fn execute_instruction(&mut self) {
+        let instruction = self.cur_instruction();
+
+        match *instruction {
+            Instruction::Halt => self.running = false,
+            Instruction::PushConst(index) => {
+                let constant = self.constants[index as usize].clone();
+                self.push_stack(constant);
+                self.ip += 1;
             }
-            let instruction = frame.function.instructions[frame.instruction_pointer].clone();
-            frame.instruction_pointer += 1;
-
-            self.execute_instruction(instruction)?;
-        }
-
-        Ok(self.stack.pop().unwrap_or(Value::Unit))
-    }
-
-    pub fn run_stdlib_function(&mut self, function: String, args: Vec<Value>) -> Option<Value> {
-        if !std_lib().contains_key(function.as_str()) {
-            return None;
-        }
-        Some(std_lib()[function.as_str()](&Value::Null, args))
-    }
-
-    #[inline]
-    fn pop_stack(&mut self) -> Value {
-        let m = self.stack.pop();
-        if m.is_none() {
-            panic!("No value to pop from stack");
-        }
-        m.unwrap()
-    }
-
-    fn execute_instruction(&mut self, instruction: Bytecode) -> Result<(), String> {
-        //println!("{:?} {:?}", instruction, self.stack);
-        match instruction {
-            // Load a constant from the function's constant pool by index
-            Bytecode::LoadConst(index) => {
-                let frame = self.call_stack.last().ok_or("No call frame found")?;
-                let constant = frame
-                    .function
-                    .constants
-                    .get(index)
-                    .cloned()
-                    .ok_or("Constant not found")?;
-                self.stack.push(constant);
+            Instruction::Add => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = self.add_values(a, b);
+                self.push_stack(result);
+                self.ip += 1;
             }
-            // Load a variable from local or global scope
-            Bytecode::LoadVar(name) => {
-                if let Some(frame) = self.call_stack.last() {
-                    if let Some(value) = frame.environment.borrow().get(&name) {
-                        self.stack.push(value);
-                    } else if let Some(value) = self.globals.get(&name).cloned() {
-                        self.stack.push(value);
-                    } else if std_lib().contains_key(name.as_str()) {
-                        self.stack.push(Value::Function(Rc::new(Function {
-                            instructions: vec![],
-                            constants: vec![],
-                            parameters: vec![],
-                            name: Some(name.clone()),
-                        })));
-                    } else {
-                        return Err(format!("Variable {} not found during LoadVar", name));
-                    }
+            Instruction::Sub => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = self.sub_values(a, b);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Mul => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = self.mul_values(a, b);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Div => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = self.div_values(a, b);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Mod => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = self.mod_values(a, b);
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Dup => {
+                let value = self.stack[self.sp - 1].clone();
+                self.push_stack(value);
+                self.ip += 1;
+            }
+            Instruction::Pop => {
+                self.pop_stack();
+                self.ip += 1;
+            }
+            Instruction::Swap => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                self.push_stack(a);
+                self.push_stack(b);
+                self.ip += 1;
+            }
+            Instruction::Jmp(offset) => {
+                self.ip = offset as usize;
+            }
+            Instruction::Jit(offset) => {
+                let condition = self.pop_stack();
+                if condition.is_truthy() {
+                    self.ip = offset as usize;
                 } else {
-                    return Err("No call frame found".to_string());
+                    self.ip += 1;
                 }
             }
-            // Store the top stack value into a variable
-            Bytecode::StoreVar(name) => {
-                let value = self.pop_stack();
-                if let Some(frame) = self.call_stack.last() {
-                    frame.environment.borrow_mut().set(name, value);
-                } else {
-                    self.globals.insert(name, value);
-                }
-            }
-            // Arithmetic operations
-            Bytecode::Add => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.add_values(a, b)?);
-            }
-            Bytecode::Sub => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.sub_values(a, b)?);
-            }
-            Bytecode::Mul => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.mul_values(a, b)?);
-            }
-            Bytecode::Div => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.div_values(a, b)?);
-            }
-            Bytecode::Mod => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.mod_values(a, b)?);
-            }
-            // Comparison operations
-            Bytecode::Eq => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(Value::Boolean(a == b));
-            }
-            Bytecode::NotEq => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(Value::Boolean(a != b));
-            }
-            Bytecode::Lt => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.lt_values(a, b)?);
-            }
-            Bytecode::Gt => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.gt_values(a, b)?);
-            }
-            Bytecode::LtEqual => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.lte_values(a, b)?);
-            }
-            Bytecode::GtEqual => {
-                let b = self.pop_stack();
-                let a = self.pop_stack();
-                self.stack.push(self.gte_values(a, b)?);
-            }
-            // Control flow
-            Bytecode::Jump(position) => {
-                let frame = self.call_stack.last_mut().ok_or("No call frame found")?;
-                frame.instruction_pointer = position;
-            }
-            Bytecode::JumpIfFalse(position) => {
+            Instruction::Jif(offset) => {
                 let condition = self.pop_stack();
                 if !condition.is_truthy() {
-                    let frame = self.call_stack.last_mut().ok_or("No call frame found")?;
-                    frame.instruction_pointer = position;
-                }
-            }
-            // Function call
-            Bytecode::Call(arg_count) => {
-                let mut args = Vec::with_capacity(arg_count);
-                for _ in 0..arg_count {
-                    args.push(self.pop_stack());
-                }
-
-                let function_value = self.pop_stack();
-
-                args.reverse();
-
-                if let Value::Function(func) = function_value {
-                    if func.name.is_some()
-                        && std_lib().contains_key(func.name.as_ref().unwrap().as_str())
-                    {
-                        let return_value = self
-                            .run_stdlib_function(func.name.as_ref().unwrap().clone(), args.clone());
-                        if let Some(value) = return_value {
-                            self.stack.push(value);
-                            return Ok(());
-                        }
-                    }
-
-                    let parent_environment = self
-                        .call_stack
-                        .last()
-                        .map(|frame| frame.environment.clone());
-
-                    let environment = Environment::new(parent_environment);
-
-                    // Set up parameters in the new environment
-                    {
-                        let mut env_mut = environment.borrow_mut();
-                        for (i, param) in func.parameters.iter().enumerate() {
-                            let arg = args.get(i).cloned().unwrap_or(Value::Null);
-                            env_mut.set(param.clone(), arg);
-                        }
-                    }
-
-                    let frame = CallFrame {
-                        function: func.clone(),
-                        instruction_pointer: 0,
-                        environment,
-                    };
-                    self.call_stack.push(frame);
-                } else if let Value::StdFunction(func) = function_value {
-                    let receiver = self.pop_stack();
-                    let result = func(&receiver, args);
-                    self.stack.push(result);
+                    self.ip = offset as usize;
                 } else {
-                    return Err(format!(
-                        "Attempted to call a non-function: {:?}",
-                        function_value
-                    ));
+                    self.ip += 1;
                 }
             }
-            // Function return
-            Bytecode::Return => {
-                let return_value = self.pop_stack();
-                self.call_stack.pop();
-                self.stack.push(return_value);
+            Instruction::Eq => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a == b);
+                self.push_stack(result);
+                self.ip += 1;
             }
-            Bytecode::GetProp(property) => {
-                let object = self.pop_stack();
-                match object {
-                    Value::Object(obj) => {
-                        let obj = obj.borrow();
-                        if let Some(value) = obj.get(&property) {
-                            self.stack.push(value.clone());
-                        } else {
-                            return Err(format!("Property {} not found", property));
-                        }
-                    }
-                    Value::Array(_) => {
-                        let array_m = array_methods();
-                        if let Some(method) = array_m.get(property.as_str()) {
-                            self.stack.push(method.clone());
-                        } else {
-                            return Err(format!("Method {} not found", property));
-                        }
-                    }
-                    _ => return Err(format!("Value is not an object {:?}", object).to_string()),
-                }
+            Instruction::Ne => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a != b);
+                self.push_stack(result);
+                self.ip += 1;
             }
-            Bytecode::SetProp(property) => {
-                let value = self.pop_stack();
-                let object = self.pop_stack();
+            Instruction::Gt => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a.greater_than(&b));
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Ge => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a.greater_than_or_equal(&b));
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Lt => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a.less_than(&b));
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Le => {
+                let a = self.pop_stack();
+                let b = self.pop_stack();
+                let result = Value::Bool(a.less_than_or_equal(&b));
+                self.push_stack(result);
+                self.ip += 1;
+            }
+            Instruction::Return => {
+                let return_address = self.pop_stack();
+                self.ip = match return_address {
+                    Value::Number(n) => n as usize,
+                    _ => {
+                        println!("Invalid return address");
+                        self.running = false;
+                        0
+                    }
+                };
+            }
+            _ => {
+                println!("Unsupported instruction");
+                self.running = false;
+            }
+        }
+    }
 
-                match object {
-                    Value::Object(obj) => {
-                        obj.borrow_mut().insert(property, value);
-                    }
-                    _ => return Err("Value is not an object".to_string()),
-                }
-            }
-            Bytecode::BuildArray(count) => {
-                let mut elements = Vec::with_capacity(count);
-                for _ in 0..count {
-                    elements.push(self.pop_stack());
-                }
-                elements.reverse(); // Reverse to maintain the correct order
-                self.stack
-                    .push(Value::Array(Rc::new(RefCell::new(elements))));
-            }
-            Bytecode::Duplicate => {
-                let value = self.stack.last().cloned().ok_or("No value to duplicate")?;
-                self.stack.push(value);
-            }
+    pub fn dump_stack(&self) {
+        println!("Stack:");
+        for value in &self.stack {
+            value.print();
+            println!();
         }
-        Ok(())
     }
 
-    /// Helper function for addition of two values.
-    fn add_values(&self, a: Value, b: Value) -> Result<Value, String> {
+    pub fn add_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x + y)),
-            (Value::String(x), Value::String(y)) => Ok(Value::String(x + &y)),
-            _ => Err("Type error in addition".to_string()),
+            (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
+            _ => {
+                println!("Unsupported operand types for addition");
+                Value::Null
+            }
         }
     }
-    fn sub_values(&self, a: Value, b: Value) -> Result<Value, String> {
+    pub fn sub_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x - y)),
-            _ => Err("Type error in subtraction".to_string()),
+            (Value::Number(a), Value::Number(b)) => Value::Number(a - b),
+            _ => {
+                println!("Unsupported operand types for subtraction");
+                Value::Null
+            }
         }
     }
-    fn mul_values(&self, a: Value, b: Value) -> Result<Value, String> {
+    pub fn mul_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x * y)),
-            _ => Err("Type error in multiplication".to_string()),
+            (Value::Number(a), Value::Number(b)) => Value::Number(a * b),
+            _ => {
+                println!("Unsupported operand types for multiplication");
+                Value::Null
+            }
         }
     }
-    fn div_values(&self, a: Value, b: Value) -> Result<Value, String> {
+    pub fn div_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x / y)),
-            _ => Err("Type error in division".to_string()),
+            (Value::Number(a), Value::Number(b)) => Value::Number(a / b),
+            _ => {
+                println!("Unsupported operand types for division");
+                Value::Null
+            }
         }
     }
-    fn mod_values(&self, a: Value, b: Value) -> Result<Value, String> {
+    pub fn mod_values(&self, a: Value, b: Value) -> Value {
         match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x % y)),
-            _ => Err("Type error in modulo".to_string()),
-        }
-    }
-    fn lt_values(&self, a: Value, b: Value) -> Result<Value, String> {
-        match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Boolean(x < y)),
-            _ => Err("Type error in less than comparison".to_string()),
-        }
-    }
-    fn gt_values(&self, a: Value, b: Value) -> Result<Value, String> {
-        match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Boolean(x > y)),
-            _ => Err("Type error in greater than comparison".to_string()),
-        }
-    }
-    fn lte_values(&self, a: Value, b: Value) -> Result<Value, String> {
-        match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Boolean(x <= y)),
-            _ => Err("Type error in less than or equal comparison".to_string()),
-        }
-    }
-    fn gte_values(&self, a: Value, b: Value) -> Result<Value, String> {
-        match (a, b) {
-            (Value::Number(x), Value::Number(y)) => Ok(Value::Boolean(x >= y)),
-            _ => Err("Type error in greater than or equal comparison".to_string()),
+            (Value::Number(a), Value::Number(b)) => Value::Number(a % b),
+            _ => {
+                println!("Unsupported operand types for modulo");
+                Value::Null
+            }
         }
     }
 }

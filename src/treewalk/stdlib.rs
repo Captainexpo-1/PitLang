@@ -1,5 +1,6 @@
-use crate::common::Value;
+use crate::tokenizer::TokenKind;
 use crate::treewalk::evaluator::runtime_error;
+use crate::treewalk::value::Value;
 use std::collections::HashMap;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value;

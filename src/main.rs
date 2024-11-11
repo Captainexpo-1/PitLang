@@ -3,13 +3,14 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::rc::Rc;
 
-use pitlang::common::Function;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
-use pitlang::virtualmachine::bytecode::dump_bytecode;
+use pitlang::virtualmachine::bytecode::Instruction;
+use pitlang::virtualmachine::bytecode::{dump_bytecode, Bytecode};
 use pitlang::virtualmachine::codegen::CodeGenerator;
-use pitlang::virtualmachine::interpreter::VM;
+use pitlang::virtualmachine::interpreter::Interpreter;
+use pitlang::virtualmachine::value::Value;
 
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
@@ -49,25 +50,37 @@ fn main() {
         evaluator::evaluate(&ast);
     }
     if args.contains(&String::from("-vm")) {
-        let mut codegen = CodeGenerator::new();
-        let bytecode = codegen.generate_bytecode(&ast);
-        // Find the -d flag
-        if let Some(d) = args.iter().position(|x| x == "-d") {
-            dump_bytecode(&bytecode.0, &bytecode.1, args[d + 1].as_str());
-        }
-        // Create a VM instance
-        let mut vm = VM::new();
+        let instructions = vec![
+            Instruction::PushConst(0),
+            Instruction::PushConst(1),
+            Instruction::Add,
+            Instruction::PushConst(2),
+            Instruction::Sub,
+            Instruction::PushConst(3),
+            Instruction::Mul,
+            Instruction::PushConst(4),
+            Instruction::Div,
+            Instruction::Halt,
+        ];
+        let constants = vec![
+            Value::Number(10.0),
+            Value::Number(5.0),
+            Value::Number(2.0),
+            Value::Number(3.0),
+            Value::Number(2.0),
+        ];
 
-        let main_function = Rc::new(Function {
-            instructions: bytecode.0,
-            constants: bytecode.1,
-            parameters: vec![],
-            name: Some("main".to_string()),
-        });
+        let bytecode = Bytecode {
+            instructions,
+            constants,
+        };
 
-        // Run the main function in the VM
-        let result = vm.run(main_function);
-        println!("{:?}", result);
+        dump_bytecode(&bytecode, "../output/bytecode.txt");
+
+        let mut interpreter = Interpreter::new();
+        interpreter.run(bytecode);
+
+        interpreter.dump_stack();
     }
     //println!("{}", result);
 }

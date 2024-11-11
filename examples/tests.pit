@@ -1,8 +1,9 @@
-let x = {
-    b: 3 + 5,
-    a:fn (self) {
-        return self.b;
+fn factorial(n){
+    if n == 0 {
+        return 1;
     }
-};
+    return n * factorial(n - 1);
+}
 
-x.a(x);
+
+factorial(3);

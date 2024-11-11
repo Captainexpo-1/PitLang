@@ -1,54 +1,52 @@
-use crate::common::Value;
+use crate::virtualmachine::value::Value;
 use std::fs::File;
 use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Bytecode {
-    // Data manipulation
-    LoadConst(usize), // Load a constant by index onto the stack
-    LoadVar(String),  // Load a variable by name
-    StoreVar(String), // Store the top of the stack into a variable
-
-    // Math operations
-    Add, // Add two numbers on the stack
-    Sub, // Subtract two numbers on the stack
-    Mul, // Multiply two numbers on the stack
-    Div, // Divide two numbers on the stack
-    Mod, // Modulo two numbers on the stack
-
-    // Logic operations
-    Eq,      // Check if two values on the stack are equal
-    NotEq,   // Check if two values on the stack are not equal
-    Lt,      // Check if the second stack value is less than the top
-    Gt,      // Check if the second stack value is greater than the top
-    LtEqual, // Check if the second stack value is less than or equal to the top
-    GtEqual, // Check if the second stack value is greater than or equal to the top
-
-    // Control flow
-    Jump(usize),        // Jump to an absolute position in the bytecode
-    JumpIfFalse(usize), // Jump if the top stack value is false
-
-    // Functions
-    Call(usize), // Call a function with a certain number of arguments + a receiver (if applicable)
-    Return,      // Return from a function
-
-    // Object and list manipulation
-    GetProp(String),   // Get a property from an object
-    SetProp(String),   // Set a property on an object
-    BuildArray(usize), // Build an array from the top n values on the stack
-
-    // Misc
-    Duplicate, // Duplicate the top value on the stack
+pub struct Bytecode {
+    pub instructions: Vec<Instruction>,
+    pub constants: Vec<Value>,
 }
 
-pub fn dump_bytecode(bytecode: &[Bytecode], constants: &[Value], path: &str) {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Instruction {
+    PushConst(u16), // push const to stack from constant pool
+
+    Pop,  // pop value from stack
+    Dup,  // duplicate top value on stack
+    Swap, // swap top two values on stack
+
+    // Binary operations
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+
+    Jmp(u16), // jump to instruction
+    Jit(u16), // jump if top of stack is true
+    Jif(u16), // jump if top of stack is false
+
+    // Comparison operations
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+
+    Return, // return from function and jump to return address on stack
+    Halt,   // halt execution
+}
+
+pub fn dump_bytecode(code: &Bytecode, path: &str) {
     let mut file = File::create(path).expect("Unable to create file");
-    for (i, instr) in bytecode.iter().enumerate() {
+    for (i, instr) in code.instructions.iter().enumerate() {
         let t = format!("{:?}", instr);
         writeln!(file, "{:04} {}", i, t).unwrap();
     }
     write!(file, "\n\nConstants:\n").unwrap();
-    for (i, constant) in constants.iter().enumerate() {
+    for (i, constant) in code.constants.iter().enumerate() {
         let t = format!("{:?}", constant);
         writeln!(file, "{:04} {}", i, t).unwrap();
     }
