@@ -6,11 +6,6 @@ use std::rc::Rc;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
-use pitlang::virtualmachine::bytecode::{self, Instruction};
-use pitlang::virtualmachine::bytecode::{dump_bytecode, Bytecode};
-use pitlang::virtualmachine::codegen::CodeGenerator;
-use pitlang::virtualmachine::interpreter::Interpreter;
-use pitlang::virtualmachine::value::Value;
 
 fn get_file_contents(file_path: &str) -> String {
     let file = File::open(file_path).expect("File not found");
@@ -49,15 +44,6 @@ fn main() {
     if args.contains(&String::from("-eval")) {
         evaluator::evaluate(&ast);
     }
-    if args.contains(&String::from("-vm")) {
-        let bytecode = CodeGenerator::new().generate_bytecode(&ast);
 
-        dump_bytecode(&bytecode, "../output/bytecode.txt");
-
-        let mut interpreter = Interpreter::new();
-        interpreter.run(bytecode);
-
-        interpreter.dump_stack();
-    }
     //println!("{}", result);
 }

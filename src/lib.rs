@@ -7,14 +7,5 @@ pub mod treewalk {
 }
 pub mod parser;
 
-pub mod tokenizer;
-
-pub mod virtualmachine {
-    pub mod bytecode;
-    pub mod codegen;
-    pub mod interpreter;
-    pub mod stdlib;
-    pub mod value;
-}
-
 pub mod common;
+pub mod tokenizer;
