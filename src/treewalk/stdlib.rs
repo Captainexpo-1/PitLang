@@ -19,7 +19,7 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
         )
     });
     methods.insert("random".to_string(), |_this: &Value, _args: Vec<Value>| {
-        Value::Number(rand::random::<f64>())
+        Value::Number(rand::random::<f64>() / f64::MAX)
     });
     methods.insert("print".to_string(), |_this: &Value, args: Vec<Value>| {
         for (i, arg) in args.iter().enumerate() {
@@ -28,7 +28,16 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
                 print!(" ");
             }
         }
-        println!();
+        Value::Null
+    });
+    methods.insert("println".to_string(), |_this: &Value, args: Vec<Value>| {
+        for (i, arg) in args.iter().enumerate() {
+            arg.print();
+            if i < args.len() - 1 {
+                print!(" ");
+            }
+            println!();
+        }
         Value::Null
     });
     methods

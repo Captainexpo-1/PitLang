@@ -101,7 +101,20 @@ pub fn tokenize(text: String) -> Vec<Token> {
                 chars.next();
             }
             '/' => {
-                tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                if let Some(&c) = chars.peek() {
+                    if c == '/' {
+                        while let Some(&c) = chars.peek() {
+                            if c == '\n' {
+                                break;
+                            }
+                            chars.next();
+                        }
+                    } else {
+                        tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                    }
+                } else {
+                    tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                }
                 chars.next();
             }
             '%' => {
@@ -199,12 +212,26 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     tokens.push(Token::new(TokenKind::Bang, "!".to_string()));
                 }
             }
-            '"' => {
+            '"' | '\'' => {
+                let chr = c;
                 let mut value = String::new();
                 chars.next();
                 while let Some(&c) = chars.peek() {
-                    if c == '"' {
+                    if c == chr {
                         break;
+                    }
+                    if c == '\\' {
+                        chars.next();
+                        let n = chars.peek().expect("Unterminated escape character");
+                        let k = match n {
+                            'n' => '\n',
+                            'r' => '\r',
+                            't' => '\t',
+                            _ => panic!("Invalid escape character \\{}", n),
+                        };
+                        value.push(k);
+                        chars.next();
+                        continue;
                     }
                     value.push(c);
                     chars.next();
@@ -216,6 +243,7 @@ pub fn tokenize(text: String) -> Vec<Token> {
                 chars.next();
                 tokens.push(Token::new(TokenKind::Dot, ".".to_string()));
             }
+
             _ => {
                 let mut value = String::new();
                 while let Some(&c) = chars.peek() {

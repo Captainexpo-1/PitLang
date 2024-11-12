@@ -12,7 +12,7 @@ pub enum Value {
     Return(Box<Value>),
     Array(Rc<RefCell<Vec<Value>>>),
     Function(Vec<String>, ASTNode),
-    StdFunction(StdMethod),
+    RustFunction(StdMethod),
     Object(Rc<RefCell<HashMap<String, Value>>>),
     Method {
         receiver: Box<Value>,
@@ -36,7 +36,7 @@ impl Value {
         match self {
             Value::Number(n) => print!("{}", n),
             Value::Boolean(b) => print!("{}", b),
-            Value::String(s) => print!("\"{}\"", s),
+            Value::String(s) => print!("{}", s),
             Value::Null => print!("null"),
             Value::Array(values) => {
                 print!("[");

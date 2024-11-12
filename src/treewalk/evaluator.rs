@@ -50,9 +50,15 @@ impl Scope {
     }
 }
 
+type MethodMap = HashMap<String, fn(&Value, Vec<Value>) -> Value>;
+
 struct TreeWalk<'a> {
     program: &'a Vec<ASTNode>,
     global_environment: Scope,
+
+    string_methods: MethodMap,
+    number_methods: MethodMap,
+    array_methods: MethodMap,
 }
 
 impl<'a> TreeWalk<'a> {
@@ -60,13 +66,20 @@ impl<'a> TreeWalk<'a> {
         TreeWalk {
             program,
             global_environment: Scope::new(None),
+            string_methods: HashMap::new(),
+            number_methods: HashMap::new(),
+            array_methods: HashMap::new(),
         }
     }
 
     fn evaluate_program(&mut self) -> Value {
+        self.string_methods = string_methods();
+        self.number_methods = number_methods();
+        self.array_methods = array_methods();
+
         let mut std_map = HashMap::new();
         for method in std_methods() {
-            std_map.insert(method.0.to_string(), Value::StdFunction(method.1));
+            std_map.insert(method.0.to_string(), Value::RustFunction(method.1));
         }
         self.global_environment.insert(
             "std".to_string(),
@@ -189,15 +202,6 @@ impl<'a> TreeWalk<'a> {
             ASTNode::FunctionCall { callee, arguments } => {
                 let func = self.evaluate_node(callee);
 
-                if let ASTNode::Variable(name) = callee.as_ref() {
-                    if name == "print" {
-                        let arg = self.evaluate_node(arguments.first().unwrap());
-                        arg.print();
-                        println!();
-                        return Value::Unit;
-                    }
-                };
-
                 match func {
                     Value::Function(params, body) => {
                         if params.len() != arguments.len() {
@@ -216,7 +220,7 @@ impl<'a> TreeWalk<'a> {
                         if let Value::Return(val) = result {
                             *val
                         } else {
-                            result
+                            Value::Null
                         }
                     }
                     Value::Method {
@@ -230,7 +234,7 @@ impl<'a> TreeWalk<'a> {
                             .map(|arg| Box::new(arg.clone()))
                             .collect::<Vec<_>>(),
                     ),
-                    Value::StdFunction(func) => {
+                    Value::RustFunction(func) => {
                         let args: Vec<Value> = arguments
                             .iter()
                             .map(|arg| self.evaluate_node(arg))
@@ -258,14 +262,10 @@ impl<'a> TreeWalk<'a> {
             .iter()
             .map(|arg| self.evaluate_node(arg))
             .collect();
-
-        let string_methods = string_methods();
-        let number_methods = number_methods();
-        let array_methods = array_methods();
         let method = match &receiver {
-            Value::String(_) => string_methods.get(method_name),
-            Value::Number(_) => number_methods.get(method_name),
-            Value::Array(_) => array_methods.get(method_name),
+            Value::String(_) => self.string_methods.get(method_name),
+            Value::Number(_) => self.number_methods.get(method_name),
+            Value::Array(_) => self.array_methods.get(method_name),
             _ => None,
         };
 
@@ -278,6 +278,12 @@ impl<'a> TreeWalk<'a> {
             ))
         }
     }
+    fn bin_op_error(&self, op: &TokenKind, left: &Value, right: &Value) -> Value {
+        runtime_error(&format!(
+            "Unsupported binary operation: {:?} {:?} {:?}",
+            left, op, right
+        ))
+    }
     fn evaluate_binary_op(&mut self, op: &TokenKind, left: &ASTNode, right: &ASTNode) -> Value {
         let left_val = self.evaluate_node(left);
         if let Value::Return(_) = left_val {
@@ -288,41 +294,40 @@ impl<'a> TreeWalk<'a> {
             return right_val;
         }
         match op {
-            TokenKind::Plus => match (left_val, right_val) {
+            TokenKind::Plus => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
-                (Value::String(a), Value::String(b)) => Value::String(a + &b),
-                _ => runtime_error("Operands must be two numbers or two strings"),
+                (Value::String(a), Value::String(b)) => Value::String(a.clone() + b),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::Minus => match (left_val, right_val) {
+            TokenKind::Minus => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a - b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::Star => match (left_val, right_val) {
+            TokenKind::Star => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a * b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::Slash => match (left_val, right_val) {
-                (Value::Number(_), Value::Number(0.0)) => runtime_error("Division by zero"),
+            TokenKind::Slash => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a / b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
             TokenKind::Equal => Value::Boolean(left_val == right_val),
             TokenKind::NotEqual => Value::Boolean(left_val != right_val),
-            TokenKind::Greater => match (left_val, right_val) {
+            TokenKind::Greater => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Boolean(a > b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::GreaterEqual => match (left_val, right_val) {
+            TokenKind::GreaterEqual => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Boolean(a >= b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::LessEqual => match (left_val, right_val) {
+            TokenKind::LessEqual => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Boolean(a <= b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
-            TokenKind::Less => match (left_val, right_val) {
+            TokenKind::Less => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Boolean(a < b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
             TokenKind::Assign => match left {
                 ASTNode::Variable(name) => {
@@ -343,9 +348,9 @@ impl<'a> TreeWalk<'a> {
                 }
                 _ => runtime_error("Left side of assignment must be a variable"),
             },
-            TokenKind::Mod => match (left_val, right_val) {
+            TokenKind::Mod => match (&left_val, &right_val) {
                 (Value::Number(a), Value::Number(b)) => Value::Number(a % b),
-                _ => runtime_error("Operands must be numbers"),
+                _ => self.bin_op_error(op, &left_val, &right_val),
             },
             _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
         }

@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
 use std::rc::Rc;
 
 use pitlang::parser;
@@ -24,6 +24,26 @@ fn main() {
     if args.len() < 2 {
         println!("Usage: {} <file>", args[0]);
         return;
+    }
+
+    if args.contains(&String::from("-h")) {
+        println!("Usage: {} <file> [-t] [-ast] [-eval]", args[0]);
+        println!("\t-t: Tokenize only");
+        println!("\t-ast: Print AST");
+        println!("\t-eval: Evaluate AST");
+        return;
+    }
+
+    if args.contains(&String::from("-repl")) {
+        loop {
+            let mut input = String::new();
+            print!("> ");
+            std::io::stdout().flush().unwrap();
+            std::io::stdin().read_line(&mut input).unwrap();
+            let tokens = tokenizer::tokenize(input);
+            let ast = parser::parse(tokens.as_slice());
+            evaluator::evaluate(&ast);
+        }
     }
 
     let file_path = &args[1];
