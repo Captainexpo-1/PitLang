@@ -1,0 +1,21 @@
+fn sort_list(list) {
+    let n = list.length();
+    let i = 0;
+    while (i < n) {
+        let j = 0;
+        while (j < (n - i - 1)) {
+            if (list.get(j) > list.get(j + 1)) {
+                let temp = list.get(j);
+                list.set(j, list.get(j + 1));
+                list.set(j + 1, temp);
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+
+let list = [5, 3, 8, 6, 2];
+std.println(list); // [5, 3, 8, 6, 2]
+sort_list(list);
+std.println(list); // [2, 3, 5, 6, 8]

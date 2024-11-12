@@ -33,4 +33,4 @@ fn sieve(n){
 }
 
 let primes_up_to_100 = sieve(1000000);
-print(primes_up_to_100);
+std.print(primes_up_to_100);

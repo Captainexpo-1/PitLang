@@ -1,0 +1,18 @@
+let person = {
+    name: "John",
+    age: 30,
+    greet: fn(this) {
+        std.println("Hello, my name is " + this.name);
+    },
+    birthday: fn(this) {
+        this.age = this.age + 1;
+        std.println("Happy Birthday! I am now " + this.age.to_string() + " years old.");
+    }
+};
+
+std.println(person.name); // "John"
+std.println(person.age); // 30
+
+person.greet(person); // "Hello, my name is John"
+person.birthday(person); // "Happy Birthday! I am now 31 years old."
+person.birthday(person); // "Happy Birthday! I am now 32 years old."
