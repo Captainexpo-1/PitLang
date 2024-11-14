@@ -1,7 +1,6 @@
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
-use std::rc::Rc;
 
 use pitlang::parser;
 use pitlang::tokenizer;
@@ -26,6 +25,9 @@ fn main() {
         return;
     }
 
+    let ast_arg = args.contains(&String::from("-ast"));
+    let token_arg = args.contains(&String::from("-t"));
+
     if args.contains(&String::from("-h")) {
         println!("Usage: {} <file> [-t] [-ast] [-eval]", args[0]);
         println!("\t-t: Tokenize only");
@@ -42,7 +44,10 @@ fn main() {
             std::io::stdin().read_line(&mut input).unwrap();
             let tokens = tokenizer::tokenize(input);
             let ast = parser::parse(tokens.as_slice());
-            evaluator::evaluate(&ast);
+            if ast_arg {
+                println!("{:?}", ast);
+            }
+            println!("{:?}", evaluator::evaluate(&ast));
         }
     }
 
@@ -50,7 +55,7 @@ fn main() {
     let contents = get_file_contents(file_path);
     let tokens = tokenizer::tokenize(contents);
 
-    if args.contains(&String::from("-t")) {
+    if token_arg {
         for token in &tokens {
             println!("{:?}", token);
         }
@@ -58,12 +63,8 @@ fn main() {
     }
 
     let ast = parser::parse(tokens.as_slice());
-    if args.contains(&String::from("-ast")) {
+    if ast_arg {
         println!("{:?}", ast);
     }
-    if args.contains(&String::from("-eval")) {
-        evaluator::evaluate(&ast);
-    }
-
-    //println!("{}", result);
+    evaluator::evaluate(&ast);
 }

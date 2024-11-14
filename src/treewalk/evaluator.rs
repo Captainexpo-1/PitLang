@@ -26,11 +26,11 @@ pub fn runtime_error(msg: &str) -> Value {
 #[derive(Clone)]
 struct Scope {
     variables: HashMap<String, Value>,
-    parent: Option<Box<Scope>>,
+    parent: Option<Rc<Scope>>,
 }
 
 impl Scope {
-    pub fn new(parent: Option<Box<Scope>>) -> Self {
+    pub fn new(parent: Option<Rc<Scope>>) -> Self {
         Scope {
             variables: HashMap::new(),
             parent,
@@ -39,14 +39,11 @@ impl Scope {
     pub fn insert(&mut self, name: String, value: Value) {
         self.variables.insert(name, value);
     }
-    pub fn get(&self, name: &str) -> Option<&Value> {
-        match self.variables.get(name) {
-            Some(val) => Some(val),
-            None => match &self.parent {
-                Some(parent) => parent.get(name),
-                None => None,
-            },
-        }
+    pub fn get(&self, name: &str) -> Option<Value> {
+        self.variables
+            .get(name)
+            .cloned()
+            .or_else(|| self.parent.as_ref()?.get(name))
     }
 }
 
@@ -119,7 +116,6 @@ impl<'a> TreeWalk<'a> {
             ASTNode::Variable(name) => self
                 .global_environment
                 .get(name)
-                .cloned()
                 .unwrap_or_else(|| runtime_error(&format!("Undefined variable: {}", name))),
             ASTNode::VariableDeclaration { name, value } => {
                 let val = self.evaluate_node(value);
@@ -208,7 +204,7 @@ impl<'a> TreeWalk<'a> {
                             runtime_error("Argument count mismatch");
                         }
                         let mut local_scope =
-                            Scope::new(Some(Box::new(self.global_environment.clone())));
+                            Scope::new(Some(Rc::new(self.global_environment.clone())));
                         for (param, arg) in params.iter().zip(arguments) {
                             let arg_val = self.evaluate_node(arg);
                             local_scope.insert(param.clone(), arg_val);
@@ -294,41 +290,37 @@ impl<'a> TreeWalk<'a> {
             return right_val;
         }
         match op {
-            TokenKind::Plus => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
-                (Value::String(a), Value::String(b)) => Value::String(a.clone() + b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::Minus => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Number(a - b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::Star => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Number(a * b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::Slash => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Number(a / b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
+            TokenKind::Plus => self.evaluate_addition(&left_val, &right_val),
+            TokenKind::Minus => self.evaluate_subtraction(&left_val, &right_val),
+            TokenKind::Star => self.evaluate_multiplication(&left_val, &right_val),
+            TokenKind::Slash => self.evaluate_division(&left_val, &right_val),
             TokenKind::Equal => Value::Boolean(left_val == right_val),
             TokenKind::NotEqual => Value::Boolean(left_val != right_val),
-            TokenKind::Greater => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Boolean(a > b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::GreaterEqual => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Boolean(a >= b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::LessEqual => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Boolean(a <= b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            TokenKind::Less => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Boolean(a < b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
+            TokenKind::Greater => self.evaluate_comparison(&left_val, &right_val, |a, b| a > b),
+            TokenKind::And => {
+                if !left_val.is_truthy() {
+                    return Value::Boolean(false);
+                }
+                if !right_val.is_truthy() {
+                    return Value::Boolean(false);
+                }
+                Value::Boolean(true)
+            }
+            TokenKind::Or => {
+                if left_val.is_truthy() {
+                    return Value::Boolean(true);
+                }
+                if right_val.is_truthy() {
+                    return Value::Boolean(true);
+                }
+                Value::Boolean(false)
+            }
+            TokenKind::GreaterEqual => {
+                self.evaluate_comparison(&left_val, &right_val, |a, b| a >= b)
+            }
+            TokenKind::Less => self.evaluate_comparison(&left_val, &right_val, |a, b| a < b),
+            TokenKind::LessEqual => self.evaluate_comparison(&left_val, &right_val, |a, b| a <= b),
+
             TokenKind::Assign => match left {
                 ASTNode::Variable(name) => {
                     self.global_environment
@@ -355,7 +347,44 @@ impl<'a> TreeWalk<'a> {
             _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
         }
     }
+    fn evaluate_addition(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
+            (Value::String(a), Value::String(b)) => Value::String(a.clone() + b),
+            _ => self.bin_op_error(&TokenKind::Plus, left_val, right_val),
+        }
+    }
 
+    fn evaluate_subtraction(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(a - b),
+            _ => self.bin_op_error(&TokenKind::Minus, left_val, right_val),
+        }
+    }
+
+    fn evaluate_multiplication(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(a * b),
+            _ => self.bin_op_error(&TokenKind::Star, left_val, right_val),
+        }
+    }
+
+    fn evaluate_division(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(a / b),
+            _ => self.bin_op_error(&TokenKind::Slash, left_val, right_val),
+        }
+    }
+
+    fn evaluate_comparison<F>(&self, left_val: &Value, right_val: &Value, cmp: F) -> Value
+    where
+        F: Fn(f64, f64) -> bool,
+    {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Boolean(cmp(*a, *b)),
+            _ => self.bin_op_error(&TokenKind::Greater, left_val, right_val),
+        }
+    }
     fn evaluate_unary_op(&mut self, op: &TokenKind, operand: &ASTNode) -> Value {
         let val = self.evaluate_node(operand);
         if let Value::Return(_) = val {

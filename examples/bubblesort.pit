@@ -15,7 +15,12 @@ fn sort_list(list) {
     }
 }
 
-let list = [5, 3, 8, 6, 2];
-std.println(list); // [5, 3, 8, 6, 2]
+let list = [];
+let i = 0;
+while (i < 1000) {
+    list.push((std.random() * std.argv().get(2).to_int()).round());
+    i = i + 1;
+}
+std.println(list);
 sort_list(list);
-std.println(list); // [2, 3, 5, 6, 8]
+std.println(list);

@@ -1,2 +1,8 @@
 /target
 /output
+.vs/*
+.vscode/*
+*.rs.bk
+Cargo.lock
+*.log
+*.tmp

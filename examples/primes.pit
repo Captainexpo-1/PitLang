@@ -29,8 +29,8 @@ fn sieve(n){
         }
         num = num + 1;
     }
-    return primes;
+    return primes.get(-1);
 }
 
-let primes_up_to_100 = sieve(1000000);
+let primes_up_to_100 = sieve(std.argv().get(2).to_int());
 std.print(primes_up_to_100);

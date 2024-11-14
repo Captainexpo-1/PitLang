@@ -36,6 +36,8 @@ pub enum TokenKind {
     False,
     While,
     Mod,
+    And,
+    Or,
     EOF,
 }
 
@@ -43,11 +45,18 @@ pub enum TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     pub value: String,
+    pub line: usize,
+    pub column: usize,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, value: String) -> Token {
-        Token { kind, value }
+    pub fn new(kind: TokenKind, value: String, line: usize, column: usize) -> Token {
+        Token {
+            kind,
+            value,
+            line,
+            column,
+        }
     }
 }
 
@@ -55,24 +64,27 @@ fn is_identifier_char(c: char) -> bool {
     c.is_alphabetic() || c == '_' || c.is_ascii_digit()
 }
 
-fn get_identifier(id: String) -> Token {
+fn get_identifier(id: String, line: usize, column: usize) -> Token {
     match id.as_str() {
-        "let" => Token::new(TokenKind::Let, id),
-        "fn" => Token::new(TokenKind::Function, id),
-        "if" => Token::new(TokenKind::If, id),
-        "else" => Token::new(TokenKind::Else, id),
-        "return" => Token::new(TokenKind::Return, id),
-        "null" => Token::new(TokenKind::Null, id),
-        "true" => Token::new(TokenKind::True, id),
-        "false" => Token::new(TokenKind::False, id),
-        "while" => Token::new(TokenKind::While, id),
-        _ => Token::new(TokenKind::Identifier, id),
+        "let" => Token::new(TokenKind::Let, id, line, column),
+        "fn" => Token::new(TokenKind::Function, id, line, column),
+        "if" => Token::new(TokenKind::If, id, line, column),
+        "else" => Token::new(TokenKind::Else, id, line, column),
+        "return" => Token::new(TokenKind::Return, id, line, column),
+        "null" => Token::new(TokenKind::Null, id, line, column),
+        "true" => Token::new(TokenKind::True, id, line, column),
+        "false" => Token::new(TokenKind::False, id, line, column),
+        "while" => Token::new(TokenKind::While, id, line, column),
+        _ => Token::new(TokenKind::Identifier, id, line, column),
     }
 }
 
 pub fn tokenize(text: String) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut chars = text.chars().peekable();
+
+    let mut line: usize = 1;
+    let mut col: usize = 1;
 
     while let Some(&c) = chars.peek() {
         match c {
@@ -86,18 +98,18 @@ pub fn tokenize(text: String) -> Vec<Token> {
                         break;
                     }
                 }
-                tokens.push(Token::new(TokenKind::Number, value));
+                tokens.push(Token::new(TokenKind::Number, value, line, col));
             }
             '+' => {
-                tokens.push(Token::new(TokenKind::Plus, "+".to_string()));
+                tokens.push(Token::new(TokenKind::Plus, "+".to_string(), line, col));
                 chars.next();
             }
             '-' => {
-                tokens.push(Token::new(TokenKind::Minus, "-".to_string()));
+                tokens.push(Token::new(TokenKind::Minus, "-".to_string(), line, col));
                 chars.next();
             }
             '*' => {
-                tokens.push(Token::new(TokenKind::Star, "*".to_string()));
+                tokens.push(Token::new(TokenKind::Star, "*".to_string(), line, col));
                 chars.next();
             }
             '/' => {
@@ -105,111 +117,127 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     if c == '/' {
                         while let Some(&c) = chars.peek() {
                             if c == '\n' {
+                                line += 1;
                                 break;
                             }
                             chars.next();
                         }
                     } else {
-                        tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                        tokens.push(Token::new(TokenKind::Slash, "/".to_string(), line, col));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Slash, "/".to_string()));
+                    tokens.push(Token::new(TokenKind::Slash, "/".to_string(), line, col));
                 }
                 chars.next();
             }
             '%' => {
-                tokens.push(Token::new(TokenKind::Mod, "%".to_string()));
+                tokens.push(Token::new(TokenKind::Mod, "%".to_string(), line, col));
                 chars.next();
             }
             '(' => {
-                tokens.push(Token::new(TokenKind::LParen, "(".to_string()));
+                tokens.push(Token::new(TokenKind::LParen, "(".to_string(), line, col));
                 chars.next();
             }
             ')' => {
-                tokens.push(Token::new(TokenKind::RParen, ")".to_string()));
+                tokens.push(Token::new(TokenKind::RParen, ")".to_string(), line, col));
                 chars.next();
             }
             '{' => {
-                tokens.push(Token::new(TokenKind::LBrace, "{".to_string()));
+                tokens.push(Token::new(TokenKind::LBrace, "{".to_string(), line, col));
                 chars.next();
             }
             '}' => {
-                tokens.push(Token::new(TokenKind::RBrace, "}".to_string()));
+                tokens.push(Token::new(TokenKind::RBrace, "}".to_string(), line, col));
                 chars.next();
             }
             '[' => {
-                tokens.push(Token::new(TokenKind::LBrack, "[".to_string()));
+                tokens.push(Token::new(TokenKind::LBrack, "[".to_string(), line, col));
                 chars.next();
             }
             ']' => {
-                tokens.push(Token::new(TokenKind::RBrack, "]".to_string()));
+                tokens.push(Token::new(TokenKind::RBrack, "]".to_string(), line, col));
                 chars.next();
             }
-            ' ' | '\t' | '\r' | '\n' | '\x0c' => {
+            '\n' => {
+                line += 1;
+                col = 0;
+                chars.next();
+            }
+            ' ' | '\t' | '\r' | '\x0c' => {
                 chars.next();
             }
             '=' => {
                 chars.next();
                 if let Some(&c) = chars.peek() {
                     if c == '=' {
-                        tokens.push(Token::new(TokenKind::Equal, "==".to_string()));
+                        tokens.push(Token::new(TokenKind::Equal, "==".to_string(), line, col));
                         chars.next();
                     } else {
-                        tokens.push(Token::new(TokenKind::Assign, "=".to_string()));
+                        tokens.push(Token::new(TokenKind::Assign, "=".to_string(), line, col));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Assign, "=".to_string()));
+                    tokens.push(Token::new(TokenKind::Assign, "=".to_string(), line, col));
                 }
             }
             '<' => {
                 chars.next();
                 if let Some(&c) = chars.peek() {
                     if c == '=' {
-                        tokens.push(Token::new(TokenKind::LessEqual, "<=".to_string()));
+                        tokens.push(Token::new(
+                            TokenKind::LessEqual,
+                            "<=".to_string(),
+                            line,
+                            col,
+                        ));
                         chars.next();
                     } else {
-                        tokens.push(Token::new(TokenKind::Less, "<".to_string()));
+                        tokens.push(Token::new(TokenKind::Less, "<".to_string(), line, col));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Less, "<".to_string()));
+                    tokens.push(Token::new(TokenKind::Less, "<".to_string(), line, col));
                 }
             }
             '>' => {
                 chars.next();
                 if let Some(&c) = chars.peek() {
                     if c == '=' {
-                        tokens.push(Token::new(TokenKind::GreaterEqual, ">=".to_string()));
+                        tokens.push(Token::new(
+                            TokenKind::GreaterEqual,
+                            ">=".to_string(),
+                            line,
+                            col,
+                        ));
                         chars.next();
                     } else {
-                        tokens.push(Token::new(TokenKind::Greater, ">".to_string()));
+                        tokens.push(Token::new(TokenKind::Greater, ">".to_string(), line, col));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Greater, ">".to_string()));
+                    tokens.push(Token::new(TokenKind::Greater, ">".to_string(), line, col));
                 }
             }
             ';' => {
-                tokens.push(Token::new(TokenKind::SemiColon, ";".to_string()));
+                tokens.push(Token::new(TokenKind::SemiColon, ";".to_string(), line, col));
                 chars.next();
             }
             ':' => {
-                tokens.push(Token::new(TokenKind::Colon, ":".to_string()));
+                tokens.push(Token::new(TokenKind::Colon, ":".to_string(), line, col));
                 chars.next();
             }
             ',' => {
-                tokens.push(Token::new(TokenKind::Comma, ",".to_string()));
+                tokens.push(Token::new(TokenKind::Comma, ",".to_string(), line, col));
                 chars.next();
             }
             '!' => {
                 chars.next();
                 if let Some(&c) = chars.peek() {
                     if c == '=' {
-                        tokens.push(Token::new(TokenKind::NotEqual, "!=".to_string()));
+                        tokens.push(Token::new(TokenKind::NotEqual, "!=".to_string(), line, col));
                         chars.next();
                     } else {
-                        tokens.push(Token::new(TokenKind::Bang, "!".to_string()));
+                        tokens.push(Token::new(TokenKind::Bang, "!".to_string(), line, col));
                     }
                 } else {
-                    tokens.push(Token::new(TokenKind::Bang, "!".to_string()));
+                    tokens.push(Token::new(TokenKind::Bang, "!".to_string(), line, col));
                 }
             }
             '"' | '\'' => {
@@ -237,11 +265,37 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     chars.next();
                 }
                 chars.next();
-                tokens.push(Token::new(TokenKind::String, value));
+                tokens.push(Token::new(TokenKind::String, value, line, col));
+            }
+            '|' => {
+                chars.next();
+                if let Some(&c) = chars.peek() {
+                    if c == '|' {
+                        tokens.push(Token::new(TokenKind::Or, "||".to_string(), line, col));
+                        chars.next();
+                    } else {
+                        panic!("Unknown character: '|{}'", c);
+                    }
+                } else {
+                    panic!("Unknown character: '|'");
+                }
+            }
+            '&' => {
+                chars.next();
+                if let Some(&c) = chars.peek() {
+                    if c == '&' {
+                        tokens.push(Token::new(TokenKind::And, "&&".to_string(), line, col));
+                        chars.next();
+                    } else {
+                        panic!("Unknown character: '&{}'", c);
+                    }
+                } else {
+                    panic!("Unknown character: '&'");
+                }
             }
             '.' => {
                 chars.next();
-                tokens.push(Token::new(TokenKind::Dot, ".".to_string()));
+                tokens.push(Token::new(TokenKind::Dot, ".".to_string(), line, col));
             }
 
             _ => {
@@ -255,15 +309,16 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     }
                 }
                 if !value.is_empty() {
-                    tokens.push(get_identifier(value));
+                    tokens.push(get_identifier(value, line, col));
                 } else {
                     let c = chars.next().unwrap();
                     panic!("Unknown character: '{}'", c);
                 }
             }
         }
+        col += 1;
     }
 
-    tokens.push(Token::new(TokenKind::EOF, "".to_string()));
+    tokens.push(Token::new(TokenKind::EOF, "".to_string(), line, col));
     tokens
 }

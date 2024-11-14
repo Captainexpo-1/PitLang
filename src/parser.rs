@@ -271,15 +271,17 @@ impl<'a> Parser<'a> {
     fn get_operator_precedence(&self, kind: &TokenKind) -> u8 {
         match kind {
             TokenKind::Assign => 1,
-            TokenKind::Equal | TokenKind::NotEqual => 2,
+            TokenKind::Or => 2,
+            TokenKind::And => 3,
+            TokenKind::Equal | TokenKind::NotEqual => 4,
             TokenKind::Less
             | TokenKind::LessEqual
             | TokenKind::Greater
-            | TokenKind::GreaterEqual => 3,
-            TokenKind::Plus | TokenKind::Minus => 4,
-            TokenKind::Star | TokenKind::Slash => 5,
-            TokenKind::LParen => 6,
-            TokenKind::Dot => 7,
+            | TokenKind::GreaterEqual => 5,
+            TokenKind::Plus | TokenKind::Minus => 6,
+            TokenKind::Star | TokenKind::Slash => 7,
+            TokenKind::LParen => 8,
+            TokenKind::Dot => 9,
             _ => 0,
         }
     }
