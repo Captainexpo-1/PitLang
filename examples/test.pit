@@ -1,5 +1,0 @@
-let array = [];
-
-if (array.length() > 0 && array.get(-1).value == "Hello, World!") {
-    std.println("Hello, World!");
-}
