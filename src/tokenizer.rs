@@ -119,6 +119,7 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
                 chars.next();
             }
             '/' => {
+                chars.next();
                 if let Some(&c) = chars.peek() {
                     if c == '/' {
                         while let Some(&c) = chars.peek() {

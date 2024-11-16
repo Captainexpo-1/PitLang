@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
     fn parse_while_statement(&mut self) -> ASTNode {
         self.expect(TokenKind::While);
         let condition = self.parse_expression(0);
-        let body = Box::new(self.parse_block());
+        let body = Box::new(self.parse_statement());
         ASTNode::WhileStatement {
             condition: Box::new(condition),
             body,
@@ -276,7 +276,16 @@ impl<'a> Parser<'a> {
     fn parse_nud(&mut self) -> ASTNode {
         let token = self.advance();
         match token.kind {
-            TokenKind::Number => ASTNode::NumberLiteral(token.value.parse().unwrap()),
+            TokenKind::Number => {
+                let num = token.value.parse();
+                if let Ok(n) = num {
+                    ASTNode::NumberLiteral(n)
+                } else {
+                    let t = &token.clone();
+                    self.error("Failed to parse number", t);
+                    ASTNode::NullLiteral
+                }
+            }
             TokenKind::String => ASTNode::StringLiteral(token.value.clone()),
             TokenKind::Identifier => ASTNode::Variable(token.value.clone()),
             TokenKind::Function => self.parse_function_declaration(false),
@@ -350,7 +359,7 @@ impl<'a> Parser<'a> {
             | TokenKind::Greater
             | TokenKind::GreaterEqual => 5,
             TokenKind::Plus | TokenKind::Minus => 6,
-            TokenKind::Star | TokenKind::Slash => 7,
+            TokenKind::Star | TokenKind::Mod | TokenKind::Slash => 7,
             TokenKind::LParen => 8,
             TokenKind::Dot => 9,
             _ => 0,

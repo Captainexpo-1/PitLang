@@ -17,8 +17,11 @@ fn sort_list(list) {
 
 let list = [];
 let i = 0;
-while (i < 1000) {
-    list.push((std.random() * std.argv().get(2).to_int()).round());
+
+let arg = std.argv().get(2).to_int();
+
+while (i < arg) {
+    list.push((std.random() * arg).round());
     i = i + 1;
 }
 std.println(list);

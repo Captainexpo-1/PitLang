@@ -281,70 +281,77 @@ impl<'a> TreeWalk<'a> {
         ))
     }
     fn evaluate_binary_op(&mut self, op: &TokenKind, left: &ASTNode, right: &ASTNode) -> Value {
-        let left_val = self.evaluate_node(left);
-        if let Value::Return(_) = left_val {
-            return left_val;
-        }
-        let right_val = self.evaluate_node(right);
-        if let Value::Return(_) = right_val {
-            return right_val;
-        }
         match op {
-            TokenKind::Plus => self.evaluate_addition(&left_val, &right_val),
-            TokenKind::Minus => self.evaluate_subtraction(&left_val, &right_val),
-            TokenKind::Star => self.evaluate_multiplication(&left_val, &right_val),
-            TokenKind::Slash => self.evaluate_division(&left_val, &right_val),
-            TokenKind::Equal => Value::Boolean(left_val == right_val),
-            TokenKind::NotEqual => Value::Boolean(left_val != right_val),
-            TokenKind::Greater => self.evaluate_comparison(&left_val, &right_val, |a, b| a > b),
             TokenKind::And => {
+                let left_val = self.evaluate_node(left);
                 if !left_val.is_truthy() {
                     return Value::Boolean(false);
                 }
-                if !right_val.is_truthy() {
-                    return Value::Boolean(false);
-                }
-                Value::Boolean(true)
+                let right_val = self.evaluate_node(right);
+                Value::Boolean(right_val.is_truthy())
             }
             TokenKind::Or => {
+                let left_val = self.evaluate_node(left);
                 if left_val.is_truthy() {
                     return Value::Boolean(true);
                 }
-                if right_val.is_truthy() {
-                    return Value::Boolean(true);
-                }
-                Value::Boolean(false)
+                let right_val = self.evaluate_node(right);
+                Value::Boolean(right_val.is_truthy())
             }
-            TokenKind::GreaterEqual => {
-                self.evaluate_comparison(&left_val, &right_val, |a, b| a >= b)
-            }
-            TokenKind::Less => self.evaluate_comparison(&left_val, &right_val, |a, b| a < b),
-            TokenKind::LessEqual => self.evaluate_comparison(&left_val, &right_val, |a, b| a <= b),
-
-            TokenKind::Assign => match left {
-                ASTNode::Variable(name) => {
-                    self.global_environment
-                        .insert(name.clone(), right_val.clone());
-                    right_val
+            _ => {
+                let left_val = self.evaluate_node(left);
+                if let Value::Return(_) = left_val {
+                    return left_val;
                 }
-                ASTNode::MemberAccess { object, member } => {
-                    let obj_val = self.evaluate_node(object);
-                    if let Value::Object(properties) = obj_val {
-                        properties
-                            .borrow_mut()
-                            .insert(member.clone(), right_val.clone());
-                        Value::Object(properties)
-                    } else {
-                        runtime_error("Attempted member access on non-object value")
+                let right_val = self.evaluate_node(right);
+                if let Value::Return(_) = right_val {
+                    return right_val;
+                }
+                match op {
+                    TokenKind::Plus => self.evaluate_addition(&left_val, &right_val),
+                    TokenKind::Minus => self.evaluate_subtraction(&left_val, &right_val),
+                    TokenKind::Star => self.evaluate_multiplication(&left_val, &right_val),
+                    TokenKind::Slash => self.evaluate_division(&left_val, &right_val),
+                    TokenKind::Equal => Value::Boolean(left_val == right_val),
+                    TokenKind::NotEqual => Value::Boolean(left_val != right_val),
+                    TokenKind::Greater => {
+                        self.evaluate_comparison(&left_val, &right_val, |a, b| a > b)
                     }
+                    TokenKind::GreaterEqual => {
+                        self.evaluate_comparison(&left_val, &right_val, |a, b| a >= b)
+                    }
+                    TokenKind::Less => {
+                        self.evaluate_comparison(&left_val, &right_val, |a, b| a < b)
+                    }
+                    TokenKind::LessEqual => {
+                        self.evaluate_comparison(&left_val, &right_val, |a, b| a <= b)
+                    }
+                    TokenKind::Assign => match left {
+                        ASTNode::Variable(name) => {
+                            self.global_environment
+                                .insert(name.clone(), right_val.clone());
+                            right_val
+                        }
+                        ASTNode::MemberAccess { object, member } => {
+                            let obj_val = self.evaluate_node(object);
+                            if let Value::Object(properties) = obj_val {
+                                properties
+                                    .borrow_mut()
+                                    .insert(member.clone(), right_val.clone());
+                                Value::Object(properties)
+                            } else {
+                                runtime_error("Attempted member access on non-object value")
+                            }
+                        }
+                        _ => runtime_error("Left side of assignment must be a variable"),
+                    },
+                    TokenKind::Mod => match (&left_val, &right_val) {
+                        (Value::Number(a), Value::Number(b)) => Value::Number(a % b),
+                        _ => self.bin_op_error(op, &left_val, &right_val),
+                    },
+                    _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
                 }
-                _ => runtime_error("Left side of assignment must be a variable"),
-            },
-            TokenKind::Mod => match (&left_val, &right_val) {
-                (Value::Number(a), Value::Number(b)) => Value::Number(a % b),
-                _ => self.bin_op_error(op, &left_val, &right_val),
-            },
-            _ => runtime_error(format!("Unknown binary operator: {:?}", op).as_str()),
+            }
         }
     }
     fn evaluate_addition(&self, left_val: &Value, right_val: &Value) -> Value {

@@ -12,7 +12,7 @@ impl TokenizerError {
             column,
         }
     }
-    pub fn to_string(&self) -> String {
+    pub fn as_message(&self) -> String {
         format!(
             "{} at line {} column {}",
             self.message, self.line, self.column
@@ -35,7 +35,7 @@ impl ParserError {
             column,
         }
     }
-    pub fn to_string(&self) -> String {
+    pub fn as_message(&self) -> String {
         format!(
             "{} at line {} column {}",
             self.message, self.line, self.column

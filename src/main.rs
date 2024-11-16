@@ -47,7 +47,7 @@ fn main() {
             let tokens = match tokenizer::tokenize(input) {
                 Ok(t) => t,
                 Err(e) => {
-                    eprintln!("Tokenization error: {}", e.to_string());
+                    eprintln!("Tokenization error: {}", e.as_message());
                     continue;
                 }
             };
@@ -56,11 +56,16 @@ fn main() {
                 Err(e) => {
                     eprintln!("Parsing error: ");
                     for error in e {
-                        eprintln!("{}", error.to_string());
+                        eprintln!("{}", error.as_message());
                     }
                     continue;
                 }
             };
+            if token_arg {
+                for token in &tokens {
+                    println!("{:?}", token);
+                }
+            }
             if ast_arg {
                 println!("{:?}", ast);
             }
@@ -80,7 +85,7 @@ fn main() {
     let tokens = match tokenizer::tokenize(contents) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("Tokenization error: {}", e.to_string());
+            eprintln!("Tokenization error: {}", e.as_message());
             return;
         }
     };
@@ -89,7 +94,6 @@ fn main() {
         for token in &tokens {
             println!("{:?}", token);
         }
-        return;
     }
 
     let ast: ASTNode = match parser::parse(tokens.as_slice()) {
@@ -97,7 +101,7 @@ fn main() {
         Err(e) => {
             eprintln!("Parsing error: ");
             for error in e {
-                eprintln!("{}", error.to_string());
+                eprintln!("{}", error.as_message());
             }
             return;
         }
