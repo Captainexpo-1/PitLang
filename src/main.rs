@@ -2,18 +2,17 @@ use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 
+use pitlang::ast::ASTNode;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
 
-fn get_file_contents(file_path: &str) -> String {
-    let file = File::open(file_path).expect("File not found");
+fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
+    let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
-    buf_reader
-        .read_to_string(&mut contents)
-        .expect("Error reading file");
-    contents
+    buf_reader.read_to_string(&mut contents)?;
+    Ok(contents)
 }
 
 fn main() {
@@ -41,9 +40,27 @@ fn main() {
             let mut input = String::new();
             print!("> ");
             std::io::stdout().flush().unwrap();
-            std::io::stdin().read_line(&mut input).unwrap();
-            let tokens = tokenizer::tokenize(input);
-            let ast = parser::parse(tokens.as_slice());
+            if let Err(e) = std::io::stdin().read_line(&mut input) {
+                eprintln!("Error reading input: {}", e);
+                continue;
+            }
+            let tokens = match tokenizer::tokenize(input) {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Tokenization error: {}", e.to_string());
+                    continue;
+                }
+            };
+            let ast = match parser::parse(tokens.as_slice()) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Parsing error: ");
+                    for error in e {
+                        eprintln!("{}", error.to_string());
+                    }
+                    continue;
+                }
+            };
             if ast_arg {
                 println!("{:?}", ast);
             }
@@ -52,8 +69,21 @@ fn main() {
     }
 
     let file_path = &args[1];
-    let contents = get_file_contents(file_path);
-    let tokens = tokenizer::tokenize(contents);
+    let contents: String = match get_file_contents(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading file '{}': {}", file_path, e);
+            return;
+        }
+    };
+
+    let tokens = match tokenizer::tokenize(contents) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Tokenization error: {}", e.to_string());
+            return;
+        }
+    };
 
     if token_arg {
         for token in &tokens {
@@ -62,7 +92,16 @@ fn main() {
         return;
     }
 
-    let ast = parser::parse(tokens.as_slice());
+    let ast: ASTNode = match parser::parse(tokens.as_slice()) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("Parsing error: ");
+            for error in e {
+                eprintln!("{}", error.to_string());
+            }
+            return;
+        }
+    };
     if ast_arg {
         println!("{:?}", ast);
     }

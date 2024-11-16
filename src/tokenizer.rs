@@ -1,3 +1,5 @@
+use crate::common::TokenizerError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     Number,
@@ -79,7 +81,11 @@ fn get_identifier(id: String, line: usize, column: usize) -> Token {
     }
 }
 
-pub fn tokenize(text: String) -> Vec<Token> {
+fn error(message: &str, line: usize, column: usize) -> Result<Vec<Token>, TokenizerError> {
+    Err(TokenizerError::new(message, line, column))
+}
+
+pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
     let mut tokens = Vec::new();
     let mut chars = text.chars().peekable();
 
@@ -250,12 +256,22 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     }
                     if c == '\\' {
                         chars.next();
-                        let n = chars.peek().expect("Unterminated escape character");
+                        let n_0 = chars.peek();
+                        if n_0.is_none() {
+                            return error("Invalid escape character", line, col);
+                        }
+                        let n = n_0.unwrap();
                         let k = match n {
                             'n' => '\n',
                             'r' => '\r',
                             't' => '\t',
-                            _ => panic!("Invalid escape character \\{}", n),
+                            _ => {
+                                return error(
+                                    format!("Invalid escape character \\{}", n).as_str(),
+                                    line,
+                                    col,
+                                )
+                            }
                         };
                         value.push(k);
                         chars.next();
@@ -274,10 +290,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
                         tokens.push(Token::new(TokenKind::Or, "||".to_string(), line, col));
                         chars.next();
                     } else {
-                        panic!("Unknown character: '|{}'", c);
+                        return error(format!("Unknown character: '|{}'", c).as_str(), line, col);
                     }
                 } else {
-                    panic!("Unknown character: '|'");
+                    return error("Unknown character: '|'", line, col);
                 }
             }
             '&' => {
@@ -287,10 +303,10 @@ pub fn tokenize(text: String) -> Vec<Token> {
                         tokens.push(Token::new(TokenKind::And, "&&".to_string(), line, col));
                         chars.next();
                     } else {
-                        panic!("Unknown character: '&{}'", c);
+                        return error(format!("Unknown character: '&{}'", c).as_str(), line, col);
                     }
                 } else {
-                    panic!("Unknown character: '&'");
+                    return error("Unknown character: '&'", line, col);
                 }
             }
             '.' => {
@@ -312,7 +328,7 @@ pub fn tokenize(text: String) -> Vec<Token> {
                     tokens.push(get_identifier(value, line, col));
                 } else {
                     let c = chars.next().unwrap();
-                    panic!("Unknown character: '{}'", c);
+                    return error(format!("Unknown character: '{}'", c).as_str(), line, col);
                 }
             }
         }
@@ -320,5 +336,5 @@ pub fn tokenize(text: String) -> Vec<Token> {
     }
 
     tokens.push(Token::new(TokenKind::EOF, "".to_string(), line, col));
-    tokens
+    Ok(tokens)
 }

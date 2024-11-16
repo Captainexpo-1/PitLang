@@ -1,7 +1,8 @@
 use crate::ast::ASTNode;
+use crate::common::ParserError;
 use crate::tokenizer::{Token, TokenKind};
 
-pub fn parse(tokens: &[Token]) -> ASTNode {
+pub fn parse(tokens: &[Token]) -> Result<ASTNode, Vec<ParserError>> {
     let mut parser = Parser::new(tokens);
     parser.parse_program()
 }
@@ -9,23 +10,56 @@ pub fn parse(tokens: &[Token]) -> ASTNode {
 struct Parser<'a> {
     tokens: &'a [Token],
     current: usize,
+    errors: Vec<ParserError>,
 }
 
 impl<'a> Parser<'a> {
     fn new(tokens: &'a [Token]) -> Self {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            errors: Vec::new(),
+        }
     }
 
-    fn parse_program(&mut self) -> ASTNode {
+    fn synchronize_tokens(&mut self) {
+        while self.current < self.tokens.len() {
+            if self.tokens[self.current].kind == TokenKind::SemiColon {
+                self.advance();
+                return;
+            }
+            self.current += 1;
+        }
+    }
+
+    fn error(&mut self, message: &str, token: &Token) {
+        self.errors
+            .push(ParserError::new(message, token.line, token.column));
+        self.synchronize_tokens();
+    }
+
+    fn parse_program(&mut self) -> Result<ASTNode, Vec<ParserError>> {
         let mut statements = Vec::new();
-        while self.tokens[self.current].kind != TokenKind::EOF {
+        while self.current < self.tokens.len() && self.tokens[self.current].kind != TokenKind::EOF {
             statements.push(self.parse_statement());
         }
-        ASTNode::Program(statements)
+        if self.errors.is_empty() {
+            Ok(ASTNode::Program(statements))
+        } else {
+            Err(self.errors.clone())
+        }
     }
 
     fn parse_statement(&mut self) -> ASTNode {
-        let token: Token = self.tokens[self.current].clone();
+        if self.current >= self.tokens.len() {
+            self.error(
+                "Unexpected end of input in statement",
+                &self.tokens[self.tokens.len() - 1],
+            );
+            return ASTNode::NullLiteral;
+        }
+
+        let token = self.tokens[self.current].clone();
         match token.kind {
             TokenKind::Let => self.parse_variable_declaration(),
             TokenKind::If => self.parse_if_statement(),
@@ -39,12 +73,12 @@ impl<'a> Parser<'a> {
             }
             _ => {
                 let expr = self.parse_expression(0);
-                if self.tokens[self.current].kind == TokenKind::SemiColon {
+                if self.current < self.tokens.len()
+                    && self.tokens[self.current].kind == TokenKind::SemiColon
+                {
                     self.expect(TokenKind::SemiColon);
-                    expr
-                } else {
-                    expr
                 }
+                expr
             }
         }
     }
@@ -62,14 +96,16 @@ impl<'a> Parser<'a> {
     fn parse_parameters(&mut self) -> Vec<String> {
         let mut parameters = Vec::new();
         self.expect(TokenKind::LParen);
-        if self.tokens[self.current].kind != TokenKind::RParen {
-            loop {
-                parameters.push(self.advance().value.clone());
-                if self.tokens[self.current].kind == TokenKind::RParen {
-                    break;
-                }
-                self.expect(TokenKind::Comma);
+        while self.current < self.tokens.len()
+            && self.tokens[self.current].kind != TokenKind::RParen
+        {
+            parameters.push(self.advance().value.clone());
+            if self.current < self.tokens.len()
+                && self.tokens[self.current].kind == TokenKind::RParen
+            {
+                break;
             }
+            self.expect(TokenKind::Comma);
         }
         self.expect(TokenKind::RParen);
         parameters
@@ -118,8 +154,25 @@ impl<'a> Parser<'a> {
     fn parse_block(&mut self) -> ASTNode {
         let mut statements = Vec::new();
         self.expect(TokenKind::LBrace);
+
+        if self.current >= self.tokens.len() {
+            self.error(
+                "Unexpected end of input in block",
+                &self.tokens[self.tokens.len() - 1],
+            );
+            return ASTNode::Block(statements);
+        }
+
         while self.tokens[self.current].kind != TokenKind::RBrace {
             statements.push(self.parse_statement());
+
+            if self.current >= self.tokens.len() {
+                self.error(
+                    "Unexpected end of input in block",
+                    &self.tokens[self.tokens.len() - 1],
+                );
+                break;
+            }
         }
         self.expect(TokenKind::RBrace);
         ASTNode::Block(statements)
@@ -129,7 +182,9 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::If);
         let condition = self.parse_expression(0);
         let consequence = self.parse_statement();
-        let alternative = if self.tokens[self.current].kind == TokenKind::Else {
+        let alternative = if self.current < self.tokens.len()
+            && self.tokens[self.current].kind == TokenKind::Else
+        {
             self.advance();
             Some(Box::new(self.parse_statement()))
         } else {
@@ -143,6 +198,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, precedence: u8) -> ASTNode {
+        if self.current >= self.tokens.len() {
+            self.error(
+                "Unexpected end of input in expression",
+                &self.tokens[self.tokens.len() - 1],
+            );
+            return ASTNode::NullLiteral;
+        }
+
         let mut left = self.parse_nud();
 
         while self.current < self.tokens.len()
@@ -197,6 +260,9 @@ impl<'a> Parser<'a> {
         if self.tokens[self.current].kind != TokenKind::RParen {
             loop {
                 arguments.push(self.parse_expression(0));
+                if self.current >= self.tokens.len() {
+                    break;
+                }
                 if self.tokens[self.current].kind == TokenKind::RParen {
                     break;
                 }
@@ -264,7 +330,12 @@ impl<'a> Parser<'a> {
                 op: token.kind,
                 operand: Box::new(self.parse_expression(3)),
             },
-            _ => panic!("Unexpected token: {:?}", token),
+            _ => {
+                let kind = token.kind;
+                let token = token.clone();
+                self.error(&format!("Unexpected token: {:?}", kind), &token);
+                ASTNode::NullLiteral
+            }
         }
     }
 
@@ -287,18 +358,30 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> &Token {
-        let token = &self.tokens[self.current];
-        self.current += 1;
-        token
+        if self.current < self.tokens.len() {
+            let token = &self.tokens[self.current];
+            self.current += 1;
+            token
+        } else {
+            // Return a dummy EOF token or handle the error
+            self.error(
+                "Unexpected end of input",
+                &self.tokens[self.tokens.len() - 1],
+            );
+            &self.tokens[self.tokens.len() - 1] // Return the last token to avoid panic
+        }
     }
 
     fn expect(&mut self, kind: TokenKind) {
-        if self.tokens[self.current].kind != kind {
-            panic!(
-                "Expected token: {:?} at token #{:?}",
-                kind, self.tokens[self.current]
-            );
+        if self.current >= self.tokens.len() || self.tokens[self.current].kind != kind {
+            let token = if self.current < self.tokens.len() {
+                &self.tokens[self.current]
+            } else {
+                &self.tokens[self.tokens.len() - 1]
+            };
+            self.error(&format!("Expected token: {:?}", kind), token);
+        } else {
+            self.advance();
         }
-        self.advance();
     }
 }
