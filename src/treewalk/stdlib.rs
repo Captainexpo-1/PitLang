@@ -2,6 +2,7 @@ use crate::treewalk::evaluator::runtime_error;
 use crate::treewalk::value::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io::Write;
 use std::rc::Rc;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value;
@@ -24,24 +25,38 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
         for arg in args.iter() {
             arg.print();
         }
+        // Flush stdout
+        std::io::stdout().flush().unwrap();
         Value::Null
     });
     methods.insert("println".to_string(), |_this: &Value, args: Vec<Value>| {
         for arg in args.iter() {
             arg.print();
-            println!();
         }
+        println!();
         Value::Null
     });
     methods.insert("argv".to_string(), |_this: &Value, _args: Vec<Value>| {
         let args: Vec<Value> = std::env::args().map(Value::String).collect();
         Value::Array(Rc::new(RefCell::new(args)))
     });
+    methods.insert(
+        "get_line".to_string(),
+        |_this: &Value, _args: Vec<Value>| {
+            let mut input = String::new();
+            if let Err(e) = std::io::stdin().read_line(&mut input) {
+                eprintln!("Error reading input: {}", e);
+                Value::Null
+            } else {
+                Value::String(input)
+            }
+        },
+    );
     methods.insert("exit".to_string(), |_this: &Value, args: Vec<Value>| {
         if let Value::Number(code) = args.first().unwrap_or(&Value::Null) {
             std::process::exit(*code as i32);
         } else {
-            runtime_error(format!("exit() argument must be a number").as_str())
+            runtime_error("exit() argument must be a number")
         }
     });
     methods
@@ -67,7 +82,7 @@ pub fn string_methods() -> HashMap<String, StdMethod> {
             if s.len() == 1 {
                 Value::Number(s.chars().next().unwrap() as u32 as f64)
             } else {
-                runtime_error(format!("ord() called on string with length != 1").as_str())
+                runtime_error("ord() called on string with length != 1")
             }
         } else {
             runtime_error(
@@ -205,6 +220,33 @@ pub fn string_methods() -> HashMap<String, StdMethod> {
             runtime_error(
                 format!(
                     "`split` method called on non-string value: expected String, got {:?}",
+                    this,
+                )
+                .as_str(),
+            )
+        }
+    });
+    methods.insert("find".to_string(), |this: &Value, args: Vec<Value>| {
+        if let Value::String(s) = this {
+            if let Some(i) = s.find(if let Value::String(s) = &args[0] {
+                s
+            } else {
+                return runtime_error(
+                    format!(
+                        "`find` method called with non-string argument: expected String, got {:?}",
+                        args[0]
+                    )
+                    .as_str(),
+                );
+            }) {
+                Value::Number(i as f64)
+            } else {
+                Value::Number(-1.)
+            }
+        } else {
+            runtime_error(
+                format!(
+                    "`find` method called on non-string value: expected String, got {:?}",
                     this,
                 )
                 .as_str(),
@@ -414,7 +456,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
             if let Some(v) = a.borrow_mut().pop() {
                 v
             } else {
-                Value::Null
+                runtime_error("pop() called on empty array")
             }
         } else {
             runtime_error(

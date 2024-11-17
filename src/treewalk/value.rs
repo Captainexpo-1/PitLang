@@ -4,6 +4,20 @@ use crate::ast::ASTNode;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value; // Takes a receiver and arguments, returns a value
 
+pub fn object_to_string(obj: &Value) {
+    if let Value::Object(properties) = obj {
+        print!("{{");
+        for (i, (key, value)) in properties.borrow().iter().enumerate() {
+            print!("{}: ", key);
+            value.print();
+            if i < properties.borrow().len() - 1 {
+                print!(", ");
+            }
+        }
+        print!("}}");
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Number(f64),
@@ -48,7 +62,7 @@ impl Value {
                 }
                 print!("]");
             }
-            Value::Object(_) => print!("Object"),
+            Value::Object(_) => object_to_string(self),
             Value::Function(_, _) => print!("Function"),
             Value::Method {
                 receiver,
