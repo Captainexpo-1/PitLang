@@ -52,6 +52,52 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
             }
         },
     );
+
+    methods.insert(
+        "write_file".to_string(),
+        |_this: &Value, args: Vec<Value>| {
+            if let Value::String(file) = &args[0] {
+                if let Value::String(contents) = &args[1] {
+                    if let Ok(mut file) = std::fs::File::create(file) {
+                        if let Err(e) = file.write_all(contents.as_bytes()) {
+                            eprintln!("Error writing to file: {}", e);
+                        }
+                    } else {
+                        eprintln!("Error creating file");
+                    }
+                    Value::Null
+                } else {
+                    runtime_error(
+                        format!("write_file contents must be a string: got {:?}", args[1]).as_str(),
+                    )
+                }
+            } else {
+                runtime_error(
+                    format!("write_file file path must be a string: got {:?}", args[0]).as_str(),
+                )
+            }
+        },
+    );
+
+    methods.insert(
+        "read_file".to_string(),
+        |_this: &Value, args: Vec<Value>| {
+            if let Value::String(file) = &args[0] {
+                match std::fs::read_to_string(file) {
+                    Ok(contents) => Value::String(contents),
+                    Err(e) => {
+                        eprintln!("Error reading file: {}", e);
+                        Value::Null
+                    }
+                }
+            } else {
+                runtime_error(
+                    format!("read_file file path must be a string: got {:?}", args[0]).as_str(),
+                )
+            }
+        },
+    );
+
     methods.insert("exit".to_string(), |_this: &Value, args: Vec<Value>| {
         if let Value::Number(code) = args.first().unwrap_or(&Value::Null) {
             std::process::exit(*code as i32);

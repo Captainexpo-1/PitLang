@@ -190,9 +190,16 @@ fn main() {
     while !stop {
         std.print("> ");
         let input = std.get_line();
-        if (input.find("exit") != -1) {
+        if input.find("exit") != -1 {
             stop = true;
-        } else {
+        } else if input.find("file") != -1 {
+            std.print("Enter filename: ");
+            let filename = std.get_line();
+            let content = std.read_file(filename);
+            let result = run_input(content);
+            std.println(result);
+        } 
+        else {
             let result = run_input(input);
             std.println(result);
         }
