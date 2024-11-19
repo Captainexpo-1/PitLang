@@ -6,6 +6,7 @@ fn generate_token(name, type) {
     return token;
 }
 
+
 fn dump_ast(ast, indent) {
     std.print("Dumping AST\n");
     let stack = [];
@@ -196,8 +197,13 @@ fn main() {
             std.print("Enter filename: ");
             let filename = std.get_line();
             let content = std.read_file(filename);
-            let result = run_input(content);
-            std.println(result);
+            if content != null {
+                let result = run_input(content);
+                std.println(result);
+            }
+            else {
+                std.println("There was an error reading the file");
+            }
         } 
         else {
             let result = run_input(input);

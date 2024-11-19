@@ -1,0 +1,47 @@
+fn get_serpinsky(n){
+    let output = "";
+    let y = n - 1;
+    while(y >= 0) { 
+        // printing space till 
+        // the value of y 
+        let i = 0;
+        while(i < y){ 
+            output = output + " ";
+            i = i + 1;
+        }
+  
+        // printing '*' 
+        let x = 0;
+        while(x + y < n ){ 
+            if ((x & y) != 0)
+                output = output + "  ";
+            else
+                output = output + "* "; 
+            x = x + 1;
+        }
+        output = output + "\n";
+        y = y - 1;
+    }
+    return output;
+}    
+
+fn pow(a, b) {
+    let out = 1;
+    while b > 0 {
+        out = out * a;
+        b = b - 1;
+    }
+    return out;
+}
+
+fn main(){
+    let args = std.argv();
+    if args.length() < 3 {
+        std.println("Usage: pitlang serpinsky.pit <number>")
+        return;
+    }
+    let n = args.get(2).to_int();
+    std.println(get_serpinsky(pow(2,n)));
+}
+
+main();

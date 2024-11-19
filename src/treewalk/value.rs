@@ -33,7 +33,6 @@ pub enum Value {
         method_name: String,
     },
     Null,
-    Unit,
 }
 
 impl Value {
@@ -70,7 +69,6 @@ impl Value {
             } => {
                 print!("Method: {:?}.{}", receiver, method_name)
             }
-            Value::Unit => (),
             _ => print!("Unsupported value"),
         }
     }

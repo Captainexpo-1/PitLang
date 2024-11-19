@@ -353,15 +353,18 @@ impl<'a> Parser<'a> {
             TokenKind::Assign => 1,
             TokenKind::Or => 2,
             TokenKind::And => 3,
-            TokenKind::Equal | TokenKind::NotEqual => 4,
+            TokenKind::BitAnd => 4,
+            //TokenKind::BitXor => 5,
+            TokenKind::BitOr => 6,
+            TokenKind::Equal | TokenKind::NotEqual => 7,
             TokenKind::Less
             | TokenKind::LessEqual
             | TokenKind::Greater
-            | TokenKind::GreaterEqual => 5,
-            TokenKind::Plus | TokenKind::Minus => 6,
-            TokenKind::Star | TokenKind::Mod | TokenKind::Slash => 7,
-            TokenKind::LParen => 8,
-            TokenKind::Dot => 9,
+            | TokenKind::GreaterEqual => 8,
+            TokenKind::Plus | TokenKind::Minus => 9,
+            TokenKind::Star | TokenKind::Mod | TokenKind::Slash => 10,
+            TokenKind::LParen => 11,
+            TokenKind::Dot => 12,
             _ => 0,
         }
     }

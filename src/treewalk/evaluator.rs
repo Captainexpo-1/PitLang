@@ -83,7 +83,7 @@ impl<'a> TreeWalk<'a> {
             Value::Object(Rc::new(RefCell::new(std_map))),
         );
 
-        let mut result = Value::Unit;
+        let mut result = Value::Null;
         for stmt in self.program {
             result = self.evaluate_node(stmt);
             if let Value::Return(val) = result {
@@ -120,7 +120,7 @@ impl<'a> TreeWalk<'a> {
             ASTNode::VariableDeclaration { name, value } => {
                 let val = self.evaluate_node(value);
                 self.global_environment.insert(name.clone(), val);
-                Value::Unit
+                Value::Null
             }
             ASTNode::Expression(expr) => self.evaluate_node(expr),
             ASTNode::BinaryOp { left, op, right } => self.evaluate_binary_op(op, left, right),
@@ -145,7 +145,7 @@ impl<'a> TreeWalk<'a> {
                 }
             }
             ASTNode::Block(statements) => {
-                let mut result = Value::Unit;
+                let mut result = Value::Null;
                 for stmt in statements {
                     result = self.evaluate_node(stmt);
                     if let Value::Return(_) = result {
@@ -166,7 +166,7 @@ impl<'a> TreeWalk<'a> {
                         if let Some(alt) = alternative {
                             self.evaluate_node(alt)
                         } else {
-                            Value::Unit
+                            Value::Null
                         }
                     }
                     _ => runtime_error("Condition must be a boolean"),
@@ -181,12 +181,12 @@ impl<'a> TreeWalk<'a> {
 
                 if name.is_some() {
                     self.global_environment.insert(name.clone().unwrap(), func);
-                    return Value::Unit;
+                    return Value::Null;
                 }
                 func
             }
             ASTNode::WhileStatement { condition, body } => {
-                let mut result = Value::Unit;
+                let mut result = Value::Null;
                 while self.evaluate_node(condition).is_truthy() {
                     result = self.evaluate_node(body);
                     if let Value::Return(_) = result {
@@ -235,7 +235,7 @@ impl<'a> TreeWalk<'a> {
                             .iter()
                             .map(|arg| self.evaluate_node(arg))
                             .collect();
-                        func(&Value::Unit, args)
+                        func(&Value::Null, args)
                     }
                     _ => runtime_error("Called value is not a function"),
                 }
@@ -326,6 +326,8 @@ impl<'a> TreeWalk<'a> {
                     TokenKind::LessEqual => {
                         self.evaluate_comparison(&left_val, &right_val, |a, b| a <= b)
                     }
+                    TokenKind::BitAnd => self.evaluate_bitwise_and(&left_val, &right_val),
+                    TokenKind::BitOr => self.evaluate_bitwise_or(&left_val, &right_val),
                     TokenKind::Assign => match left {
                         ASTNode::Variable(name) => {
                             self.global_environment
@@ -380,6 +382,20 @@ impl<'a> TreeWalk<'a> {
         match (left_val, right_val) {
             (Value::Number(a), Value::Number(b)) => Value::Number(a / b),
             _ => self.bin_op_error(&TokenKind::Slash, left_val, right_val),
+        }
+    }
+
+    fn evaluate_bitwise_and(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i64) & (*b as i64)) as f64),
+            _ => self.bin_op_error(&TokenKind::BitAnd, left_val, right_val),
+        }
+    }
+
+    fn evaluate_bitwise_or(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i64) & (*b as i64)) as f64),
+            _ => self.bin_op_error(&TokenKind::BitAnd, left_val, right_val),
         }
     }
 

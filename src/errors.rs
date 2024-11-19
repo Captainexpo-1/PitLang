@@ -6,7 +6,6 @@ pub enum EvalError {
     TypeError(String),
     ArgumentError(String),
     Runtime(String),
-    // Add more variants as needed
 }
 
 impl fmt::Display for EvalError {

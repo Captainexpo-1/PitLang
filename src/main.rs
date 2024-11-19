@@ -1,7 +1,6 @@
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
-
 use pitlang::ast::ASTNode;
 use pitlang::parser;
 use pitlang::tokenizer;
@@ -16,7 +15,7 @@ fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
 }
 
 fn main() {
-    env::set_var("RUST_BACKTRACE", "1");
+    //env::set_var("RUST_BACKTRACE", "1");
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {

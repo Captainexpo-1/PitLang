@@ -40,6 +40,8 @@ pub enum TokenKind {
     Mod,
     And,
     Or,
+    BitAnd,
+    BitOr,
     EOF,
 }
 
@@ -304,10 +306,12 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
                         tokens.push(Token::new(TokenKind::And, "&&".to_string(), line, col));
                         chars.next();
                     } else {
-                        return error(format!("Unknown character: '&{}'", c).as_str(), line, col);
+                        tokens.push(Token::new(TokenKind::BitAnd, "&".to_string(), line, col));
+                        chars.next();
                     }
                 } else {
-                    return error("Unknown character: '&'", line, col);
+                    tokens.push(Token::new(TokenKind::BitAnd, "&".to_string(), line, col));
+                    chars.next();
                 }
             }
             '.' => {
