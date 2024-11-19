@@ -15,20 +15,70 @@ fn imaginary_add(num1, num2) {
 }
 
 fn imaginary_abs(i){
-    return i.a*i.a+i.b*i.b;
+    return i.a*i.a + i.b*i.b;
 }
 
 // z(n+1) = (z(n))^2 + c
 // z(0) = 0
-fn mandelbrot(x, y) {
+fn mandelbrot(cx, cy, width, height, max_iter) {
     fn recurse(n, c) {
         if n == 0 {
             return c;
         }
         return imaginary_add(imaginary_squared(recurse(n - 1, c)), c);
     }
-    let r = recurse(4, imaginary(x, y));
-    std.println(imaginary_abs(r));
+    let x = cx - width / 2;
+    let y = cy + height / 2;
+    let x_step = width / 100;
+    let y_step = height / 100;
+
+    let s = "";
+
+    let i = 0;
+    while i < 100 {
+        let j = 0;
+        while j < 100 {
+            let c = imaginary(x, y);
+            let z = recurse(max_iter, imaginary(0, 0));
+            let k = 0;
+            let break = false;
+            while k < max_iter && !break {
+                if imaginary_abs(z) > 4 {
+                    break = true;
+                }
+                else {
+                    z = imaginary_add(imaginary_squared(z), c);
+                    k = k + 1;
+                }
+
+            }
+            if k == max_iter {
+                std.print("* ");
+            } else {
+                std.print("  ");
+            }
+            x = x + x_step;
+            j = j + 1;
+        }
+        std.print("\n");
+        x = cx - width / 2;
+        y = y - y_step;
+        i = i + 1;
+    }
 }
 
-mandelbrot(std.argv().get(2).to_float(), std.argv().get(3).to_float())
+fn main() {
+    let args = std.argv();
+    if args.length() < 5 {
+        std.println("Usage: pitlang mandelbrot.pit <cx> <cy> <width> <height> <max_iter>")
+        return;
+    }
+    let cx = args.get(2).to_float();
+    let cy = args.get(3).to_float();
+    let width = args.get(4).to_float();
+    let height = args.get(5).to_float();
+    let max_iter = args.get(6).to_int();
+    mandelbrot(cx, cy, width, height, max_iter);
+}
+
+main();
