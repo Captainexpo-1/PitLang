@@ -21,7 +21,14 @@ PitLang is a simple, interpreted programming language designed for educational p
 To run a PitLang script, use the following command:
 
 ```sh
-cargo run -- <script.pit> -eval
+cargo run -- <script.pit> [arg1 arg2 ...]
+```
+
+Alternatively, you can build the project and run the executable directly:
+
+```sh
+cargo build --release
+./target/release/pitlang <script.pit>
 ```
 
 ## Syntax
@@ -41,6 +48,7 @@ PitLang supports the following data types:
 - `String`: Text enclosed in double quotes (`"`).
 - `Array`: Ordered collections of values.
 - `Null`: Represents the absence of a value.
+- `Object`: Collections of key-value pairs. Similar to dictionaries in Python or objects in JavaScript.
 
 ## Variables
 
@@ -131,68 +139,78 @@ person.birthday(person); // "Happy Birthday! I am now 32 years old."
 
 ## Standard Library
 
-PitLang includes a small standard library with useful functions:
+### Standard Methods
 
-### `std.print`
+- `std.time()`: Returns the current time in seconds since the Unix epoch.
+- `std.random()`: Returns a random number between 0 and 1.
+- `std.print(...)`: Prints values to the console.
+- `std.println(...)`: Prints values to the console with a newline at the end.
+- `std.argv()`: Returns the command line arguments as an array of strings.
+- `std.get_line()`: Reads a line from stdin.
+- `std.write_file(filename, content)`: Writes the content to the specified file.
+- `std.read_file(filename)`: Reads the contents of the specified file.
+- `std.exit(code)`: Exits the program with the given exit code.
 
-Prints values to the console:
+### String Methods
 
-```rust
-std.print("Hello, World!");
-std.print("1",2,"More",[4,5,6]) // Can print multiple values
-```
+- `str.to_string()`: Converts a value to a string.
+- `str.to_number()`: Converts a string to a number.
+- `str.length()`: Returns the length of a string.
+- `str.split(separator)`: Splits a string into an array of substrings using the specified separator.
+- `str.trim()`: Removes whitespace from the beginning and end of a string.
+- `str.replace(old, new)`: Replaces occurrences of the old substring with the new substring.
+- `str.find(substring)`: Returns the index of the first occurrence of the substring in the string, or -1 if not found.
 
-### `std.time`
+### Array Methods
 
-Returns the current time in seconds since the Unix epoch:
+- `arr.push(value)`: Adds a value to the end of the array.
+- `arr.pop()`: Removes and returns the last element of the array.
+- `arr.get(index)`: Returns the value at the specified index.
+- `arr.set(index, value)`: Sets the value at the specified index.
+- `arr.length()`: Returns the length of the array.
+- `arr.find(value)`: Returns the index of the first occurrence of the value in the array, or -1 if not found.
+- `arr.copy()`: Returns a copy of the array.
 
-```rust
-let currentTime = std.time();
-```
+### Number Methods
 
-### `std.random`
-
-Returns a random number between 0 and 1:
-
-```rust
-let randomNumber = std.random();
-```
+- `num.to_string()`: Converts the number to a string.
+- `num.round()`: Rounds the number to the nearest integer.
+- `num.floor()`: Rounds the number down to the nearest integer.
+- `num.ceil()`: Rounds the number up to the nearest integer.
 
 ## Examples
 
-### Prime Number Sieve
-
 ```rust
 fn sieve(n) {
-    let is_prime = [];
+    let is_prime = []; // Initialize an empty array to store prime status
     let i = 0;
     while (i <= n) {
-        is_prime.push(true);
+        is_prime.push(true); // Assume all numbers are prime initially
         i = i + 1;
     }
-    is_prime.set(0, false);
-    is_prime.set(1, false);
+    is_prime.set(0, false); // 0 is not a prime number
+    is_prime.set(1, false); // 1 is not a prime number
     let p = 2;
     while (p * p <= n) {
-        if (is_prime.get(p)) {
+        if (is_prime.get(p)) { // If p is a prime
             let multiple = p * p;
             while (multiple <= n) {
-                is_prime.set(multiple, false);
+                is_prime.set(multiple, false); // Mark multiples of p as not prime
                 multiple = multiple + p;
             }
         }
         p = p + 1;
     }
-    let primes = [];
+    let primes = []; // Initialize an empty array to store prime numbers
     let num = 2;
     while (num <= n) {
-        if (is_prime.get(num)) {
-            primes.push(num);
+        if (is_prime.get(num)) { // If num is a prime
+            primes.push(num); // Add num to the primes array
         }
         num = num + 1;
     }
-    return primes;
+    return primes.get(-1); // Return the last prime number in the array
 }
-let primes_up_to_100 = sieve(100);
-std.print(primes_up_to_100);
+let primes_up_to_100 = sieve(100); // Find all prime numbers up to 100
+std.print(primes_up_to_100); // Print the largest prime number up to 100
 ```

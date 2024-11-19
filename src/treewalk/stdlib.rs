@@ -9,6 +9,20 @@ pub type StdMethod = fn(&Value, Vec<Value>) -> Value;
 
 pub fn std_methods() -> HashMap<String, StdMethod> {
     // For the included 'std' object, E.G. std.time()
+
+    /*
+    Description of the methods:
+    - time: Returns the current time in seconds since the Unix epoch.
+    - random: Returns a random number between 0 and 1.
+    - print: Prints the arguments to stdout.
+    - println: Prints the arguments to stdout followed by a newline.
+    - argv: Returns the command line arguments as an array of strings.
+    - get_line: Reads a line from stdin.
+    - write_file: Writes the second argument to the file specified by the first argument.
+    - read_file: Reads the contents of the file specified by the first argument.
+    - exit: Exits the program with the given exit code.
+    */
+
     let mut methods: HashMap<String, StdMethod> = HashMap::new();
     methods.insert("time".to_string(), |_this: &Value, _args: Vec<Value>| {
         Value::Number(
@@ -110,6 +124,19 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
 
 pub fn string_methods() -> HashMap<String, StdMethod> {
     let mut methods: HashMap<String, StdMethod> = HashMap::new();
+
+    /*
+    Description of the methods:
+    - length: Returns the length of the string.
+    - ord: Returns the ASCII value of the first character in the string.
+    - get: Returns the character at the given index.
+    - to_int: Converts the string to an integer.
+    - to_float: Converts the string to a float.
+    - replace: Replaces all occurrences of the first argument with the second argument.
+    - split: Splits the string by the given separator.
+    - find: Returns the index of the first occurrence of the given string.
+    */
+
     methods.insert("length".to_string(), |this: &Value, _args: Vec<Value>| {
         if let Value::String(s) = this {
             Value::Number(s.len() as f64)
@@ -304,6 +331,15 @@ pub fn string_methods() -> HashMap<String, StdMethod> {
 
 pub fn number_methods() -> HashMap<String, StdMethod> {
     let mut methods: HashMap<String, StdMethod> = HashMap::new();
+
+    /*
+    Description of the methods:
+    - to_string: Converts the number to a string.
+    - round: Rounds the number to the nearest integer.
+    - floor: Rounds the number down to the nearest integer.
+    - ceil: Rounds the number up to the nearest integer.
+     */
+
     methods.insert(
         "to_string".to_string(),
         |this: &Value, _args: Vec<Value>| {
@@ -365,17 +401,23 @@ pub fn number_methods() -> HashMap<String, StdMethod> {
 pub fn array_methods() -> HashMap<String, StdMethod> {
     let mut methods: HashMap<String, StdMethod> = HashMap::new();
 
+    /*
+    Description of the methods:
+    - length: Returns the length of the array.
+    - remove: Removes the element at the given index.
+    - push: Appends the given value to the end of the array.
+    - set: Sets the value at the given index.
+    - get: Returns the value at the given index.
+    - pop: Removes and returns the last element of the array.
+    - find: Returns the index of the first occurrence of the given value.
+    - copy: Returns a shallow copy of the array.
+    */
+
     methods.insert("length".to_string(), |this: &Value, _args: Vec<Value>| {
         if let Value::Array(a) = this {
             Value::Number(a.borrow().len() as f64)
         } else {
-            runtime_error(
-                format!(
-                    "`length` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("remove".to_string(), |this: &Value, args: Vec<Value>| {
@@ -405,13 +447,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
                 )
             }
         } else {
-            runtime_error(
-                format!(
-                    "`remove` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("push".to_string(), |this: &Value, args: Vec<Value>| {
@@ -419,13 +455,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
             a.borrow_mut().push(args[0].clone());
             Value::Null
         } else {
-            runtime_error(
-                format!(
-                    "`push` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("set".to_string(), |this: &Value, args: Vec<Value>| {
@@ -451,13 +481,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
                 )
             }
         } else {
-            runtime_error(
-                format!(
-                    "`set` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("get".to_string(), |this: &Value, args: Vec<Value>| {
@@ -488,13 +512,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
                 )
             }
         } else {
-            runtime_error(
-                format!(
-                    "`get` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("pop".to_string(), |this: &Value, _args: Vec<Value>| {
@@ -505,13 +523,7 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
                 runtime_error("pop() called on empty array")
             }
         } else {
-            runtime_error(
-                format!(
-                    "`pop` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
         }
     });
     methods.insert("find".to_string(), |this: &Value, _args: Vec<Value>| {
@@ -522,13 +534,15 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
                 Value::Number(-1.)
             }
         } else {
-            runtime_error(
-                format!(
-                    "`find` method called on non-array value: expected Array, got {:?}",
-                    this,
-                )
-                .as_str(),
-            )
+            Value::Null // Unreachable
+        }
+    });
+    methods.insert("copy".to_string(), |this: &Value, _args: Vec<Value>| {
+        if let Value::Array(a) = this {
+            let copy = a.borrow().clone();
+            Value::Array(Rc::new(RefCell::new(copy)))
+        } else {
+            Value::Null // Unreachable
         }
     });
     methods

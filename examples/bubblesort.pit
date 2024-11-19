@@ -15,15 +15,25 @@ fn sort_list(list) {
     }
 }
 
-let list = [];
-let i = 0;
+fn main(){
+    let list = [];
+    let i = 0;
 
-let arg = std.argv().get(2).to_int();
+    if std.argv().length() < 3 {
+        std.println("Usage: pitlang bubblesort.pit <number>");
+        return;
+    }
 
-while (i < arg) {
-    list.push((std.random() * arg).round());
-    i = i + 1;
+    let arg = std.argv().get(2).to_int();
+
+    while (i < arg) {
+        list.push((std.random() * arg).round());
+        i = i + 1;
+    }
+    std.println(list); // Unsorted list
+    sort_list(list); // Sort the list in place
+    std.println(list); // Sorted list
 }
-std.println(list);
-sort_list(list);
-std.println(list);
+
+
+main();
