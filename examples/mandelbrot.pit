@@ -1,3 +1,14 @@
+let grad = [" ", ".", ",", "-", "~", ":", ";", "=", "!", "*", "#", "$", "@", "B", "%", "W", "&", "M"];
+fn get_gradient(t) {
+    if t < 0 {
+        return grad.get(0);
+    }
+    if t >= grad.length() {
+        return grad.get(-1);
+    }
+    return grad.get(t);
+}
+
 fn imaginary(a_0, b_0) {
     return {
         a: a_0,
@@ -50,12 +61,11 @@ fn mandelbrot(cx, cy, width, height, max_iter) {
                     z = imaginary_add(imaginary_squared(z), c);
                     k = k + 1;
                 }
-
             }
             if k == max_iter {
-                std.print("* ");
+                std.print("⬜");
             } else {
-                std.print("  ");
+                std.print(get_gradient(k));
             }
             x = x + x_step;
             j = j + 1;

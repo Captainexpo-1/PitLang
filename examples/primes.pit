@@ -37,5 +37,7 @@ if std.argv().length() < 3 {
     return;
 }
 
-let primes_up_to_100 = sieve(std.argv().get(2).to_int());
+let arg = std.argv().get(2).to_int();
+
+let primes_up_to_100 = sieve(arg);
 std.print(primes_up_to_100);

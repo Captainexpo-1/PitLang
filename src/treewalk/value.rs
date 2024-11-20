@@ -26,6 +26,16 @@ impl Scope {
             .cloned()
             .or_else(|| self.parent.as_ref()?.borrow().get(name))
     }
+    pub fn set(&mut self, name: &str, value: Value) -> bool {
+        if self.variables.contains_key(name) {
+            self.variables.insert(name.to_string(), value);
+            true
+        } else if let Some(parent) = &self.parent {
+            parent.borrow_mut().set(name, value)
+        } else {
+            false
+        }
+    }
 }
 
 pub fn object_to_string(obj: &Value) {

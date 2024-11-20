@@ -334,9 +334,10 @@ impl<'a> TreeWalk<'a> {
                     TokenKind::BitOr => self.evaluate_bitwise_or(&left_val, &right_val),
                     TokenKind::Assign => match left {
                         ASTNode::Variable(name) => {
-                            self.current_scope
-                                .borrow_mut()
-                                .insert(name.clone(), right_val.clone());
+                            let right_val = self.evaluate_node(right);
+                            if !self.current_scope.borrow_mut().set(name, right_val.clone()) {
+                                runtime_error(&format!("Undefined variable: {}", name));
+                            }
                             right_val
                         }
                         ASTNode::MemberAccess { object, member } => {
@@ -344,8 +345,8 @@ impl<'a> TreeWalk<'a> {
                             if let Value::Object(properties) = obj_val {
                                 properties
                                     .borrow_mut()
-                                    .insert(member.clone(), right_val.clone());
-                                Value::Object(properties)
+                                    .insert(member.clone(), self.evaluate_node(right));
+                                Value::Null
                             } else {
                                 runtime_error("Attempted member access on non-object value")
                             }
