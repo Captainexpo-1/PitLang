@@ -29,7 +29,7 @@ fn imaginary_abs(i){
     return i.a*i.a + i.b*i.b;
 }
 
-// z(n+1) = (z(n))^2 + c
+// z(n) = (z(n - 1))^2 + c
 // z(0) = 0
 fn mandelbrot(cx, cy, width, height, max_iter) {
     fn recurse(n, c) {
@@ -38,8 +38,8 @@ fn mandelbrot(cx, cy, width, height, max_iter) {
         }
         return imaginary_add(imaginary_squared(recurse(n - 1, c)), c);
     }
-    let x = cx - width / 2;
-    let y = cy + height / 2;
+    let x = cx - width;
+    let y = cy + height;
     let x_step = width / 100;
     let y_step = height / 100;
 
