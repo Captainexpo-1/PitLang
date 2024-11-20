@@ -1,7 +1,7 @@
 use crate::ast::ASTNode;
 use crate::tokenizer::TokenKind;
 use crate::treewalk::stdlib::{array_methods, number_methods, string_methods};
-use crate::treewalk::value::Value;
+use crate::treewalk::value::{Scope, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -23,35 +23,12 @@ pub fn runtime_error(msg: &str) -> Value {
     panic!("Runtime error: {}", msg);
 }
 
-#[derive(Clone)]
-struct Scope {
-    variables: HashMap<String, Value>,
-    parent: Option<Rc<Scope>>,
-}
-
-impl Scope {
-    pub fn new(parent: Option<Rc<Scope>>) -> Self {
-        Scope {
-            variables: HashMap::new(),
-            parent,
-        }
-    }
-    pub fn insert(&mut self, name: String, value: Value) {
-        self.variables.insert(name, value);
-    }
-    pub fn get(&self, name: &str) -> Option<Value> {
-        self.variables
-            .get(name)
-            .cloned()
-            .or_else(|| self.parent.as_ref()?.get(name))
-    }
-}
-
 type MethodMap = HashMap<String, fn(&Value, Vec<Value>) -> Value>;
 
 struct TreeWalk<'a> {
     program: &'a Vec<ASTNode>,
-    global_environment: Scope,
+    global_environment: Rc<RefCell<Scope>>,
+    current_scope: Rc<RefCell<Scope>>,
 
     string_methods: MethodMap,
     number_methods: MethodMap,
@@ -60,9 +37,12 @@ struct TreeWalk<'a> {
 
 impl<'a> TreeWalk<'a> {
     pub fn new(program: &'a Vec<ASTNode>) -> Self {
+        let global_env = Rc::new(RefCell::new(Scope::new(None)));
         TreeWalk {
             program,
-            global_environment: Scope::new(None),
+            global_environment: global_env.clone(),
+            current_scope: global_env,
+
             string_methods: HashMap::new(),
             number_methods: HashMap::new(),
             array_methods: HashMap::new(),
@@ -78,7 +58,7 @@ impl<'a> TreeWalk<'a> {
         for method in std_methods() {
             std_map.insert(method.0.to_string(), Value::RustFunction(method.1));
         }
-        self.global_environment.insert(
+        self.global_environment.borrow_mut().insert(
             "std".to_string(),
             Value::Object(Rc::new(RefCell::new(std_map))),
         );
@@ -114,12 +94,13 @@ impl<'a> TreeWalk<'a> {
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             ASTNode::Variable(name) => self
-                .global_environment
+                .current_scope
+                .borrow()
                 .get(name)
                 .unwrap_or_else(|| runtime_error(&format!("Undefined variable: {}", name))),
             ASTNode::VariableDeclaration { name, value } => {
                 let val = self.evaluate_node(value);
-                self.global_environment.insert(name.clone(), val);
+                self.current_scope.borrow_mut().insert(name.clone(), val);
                 Value::Null
             }
             ASTNode::Expression(expr) => self.evaluate_node(expr),
@@ -145,6 +126,10 @@ impl<'a> TreeWalk<'a> {
                 }
             }
             ASTNode::Block(statements) => {
+                let previous_scope = self.current_scope.clone();
+                self.current_scope =
+                    Rc::new(RefCell::new(Scope::new(Some(previous_scope.clone()))));
+
                 let mut result = Value::Null;
                 for stmt in statements {
                     result = self.evaluate_node(stmt);
@@ -152,6 +137,8 @@ impl<'a> TreeWalk<'a> {
                         break;
                     }
                 }
+
+                self.current_scope = previous_scope;
                 result
             }
             ASTNode::IfStatement {
@@ -177,13 +164,20 @@ impl<'a> TreeWalk<'a> {
                 parameters,
                 body,
             } => {
-                let func = Value::Function(parameters.clone(), *body.clone());
+                let func = Value::Function {
+                    parameters: parameters.clone(),
+                    body: Box::new(*body.clone()),
+                    env: self.current_scope.clone(),
+                };
 
-                if name.is_some() {
-                    self.global_environment.insert(name.clone().unwrap(), func);
-                    return Value::Null;
+                if let Some(name) = name {
+                    self.current_scope
+                        .borrow_mut()
+                        .insert(name.clone(), func.clone());
+                    Value::Null
+                } else {
+                    func
                 }
-                func
             }
             ASTNode::WhileStatement { condition, body } => {
                 let mut result = Value::Null;
@@ -199,20 +193,30 @@ impl<'a> TreeWalk<'a> {
                 let func = self.evaluate_node(callee);
 
                 match func {
-                    Value::Function(params, body) => {
-                        if params.len() != arguments.len() {
+                    Value::Function {
+                        parameters,
+                        body,
+                        env,
+                    } => {
+                        if parameters.len() != arguments.len() {
                             runtime_error("Argument count mismatch");
                         }
-                        let mut local_scope =
-                            Scope::new(Some(Rc::new(self.global_environment.clone())));
-                        for (param, arg) in params.iter().zip(arguments) {
-                            let arg_val = self.evaluate_node(arg);
-                            local_scope.insert(param.clone(), arg_val);
+
+                        let new_scope = Rc::new(RefCell::new(Scope::new(Some(env.clone()))));
+                        {
+                            let mut scope_borrow = new_scope.borrow_mut();
+                            for (param, arg) in parameters.iter().zip(arguments) {
+                                let arg_val = self.evaluate_node(arg);
+                                scope_borrow.insert(param.clone(), arg_val);
+                            }
                         }
-                        let previous_env =
-                            std::mem::replace(&mut self.global_environment, local_scope);
+
+                        let previous_scope = self.current_scope.clone();
+                        self.current_scope = new_scope;
+
                         let result = self.evaluate_node(&body);
-                        self.global_environment = previous_env;
+
+                        self.current_scope = previous_scope;
                         if let Value::Return(val) = result {
                             *val
                         } else {
@@ -330,7 +334,8 @@ impl<'a> TreeWalk<'a> {
                     TokenKind::BitOr => self.evaluate_bitwise_or(&left_val, &right_val),
                     TokenKind::Assign => match left {
                         ASTNode::Variable(name) => {
-                            self.global_environment
+                            self.current_scope
+                                .borrow_mut()
                                 .insert(name.clone(), right_val.clone());
                             right_val
                         }
@@ -387,14 +392,18 @@ impl<'a> TreeWalk<'a> {
 
     fn evaluate_bitwise_and(&self, left_val: &Value, right_val: &Value) -> Value {
         match (left_val, right_val) {
-            (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i64) & (*b as i64)) as f64),
+            (Value::Number(a), Value::Number(b)) => {
+                Value::Number(((*a as i64) & (*b as i64)) as f64)
+            }
             _ => self.bin_op_error(&TokenKind::BitAnd, left_val, right_val),
         }
     }
 
     fn evaluate_bitwise_or(&self, left_val: &Value, right_val: &Value) -> Value {
         match (left_val, right_val) {
-            (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i64) & (*b as i64)) as f64),
+            (Value::Number(a), Value::Number(b)) => {
+                Value::Number(((*a as i64) & (*b as i64)) as f64)
+            }
             _ => self.bin_op_error(&TokenKind::BitAnd, left_val, right_val),
         }
     }

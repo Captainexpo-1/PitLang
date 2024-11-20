@@ -4,6 +4,30 @@ use crate::ast::ASTNode;
 
 pub type StdMethod = fn(&Value, Vec<Value>) -> Value; // Takes a receiver and arguments, returns a value
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Scope {
+    variables: HashMap<String, Value>,
+    parent: Option<Rc<RefCell<Scope>>>,
+}
+
+impl Scope {
+    pub fn new(parent: Option<Rc<RefCell<Scope>>>) -> Self {
+        Scope {
+            variables: HashMap::new(),
+            parent,
+        }
+    }
+    pub fn insert(&mut self, name: String, value: Value) {
+        self.variables.insert(name, value);
+    }
+    pub fn get(&self, name: &str) -> Option<Value> {
+        self.variables
+            .get(name)
+            .cloned()
+            .or_else(|| self.parent.as_ref()?.borrow().get(name))
+    }
+}
+
 pub fn object_to_string(obj: &Value) {
     if let Value::Object(properties) = obj {
         print!("{{");
@@ -25,7 +49,11 @@ pub enum Value {
     String(String),
     Return(Box<Value>),
     Array(Rc<RefCell<Vec<Value>>>),
-    Function(Vec<String>, ASTNode),
+    Function {
+        parameters: Vec<String>,
+        body: Box<ASTNode>,
+        env: Rc<RefCell<Scope>>,
+    },
     RustFunction(StdMethod),
     Object(Rc<RefCell<HashMap<String, Value>>>),
     Method {
@@ -62,7 +90,7 @@ impl Value {
                 print!("]");
             }
             Value::Object(_) => object_to_string(self),
-            Value::Function(_, _) => print!("Function"),
+            Value::Function { .. } => print!("Function"),
             Value::Method {
                 receiver,
                 method_name,
