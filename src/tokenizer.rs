@@ -37,6 +37,7 @@ pub enum TokenKind {
     True,
     False,
     While,
+    For,
     Mod,
     And,
     Or,
@@ -79,6 +80,8 @@ fn get_identifier(id: String, line: usize, column: usize) -> Token {
         "true" => Token::new(TokenKind::True, id, line, column),
         "false" => Token::new(TokenKind::False, id, line, column),
         "while" => Token::new(TokenKind::While, id, line, column),
+        "for" => Token::new(TokenKind::For, id, line, column),
+         
         _ => Token::new(TokenKind::Identifier, id, line, column),
     }
 }

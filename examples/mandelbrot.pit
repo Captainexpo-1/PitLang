@@ -38,43 +38,26 @@ fn mandelbrot(cx, cy, width, height, max_iter) {
         }
         return imaginary_add(imaginary_squared(recurse(n - 1, c)), c);
     }
-    let x = cx - width;
-    let y = cy + height;
-    let x_step = width / 100;
-    let y_step = height / 100;
-
-    let s = "";
-
-    let i = 0;
-    while i < 100 {
-        let j = 0;
-        while j < 100 {
-            let c = imaginary(x, y);
-            let z = recurse(max_iter, imaginary(0, 0));
-            let k = 0;
-            let break = false;
-            while k < max_iter && !break {
-                if imaginary_abs(z) > 4 {
-                    break = true;
-                }
-                else {
-                    z = imaginary_add(imaginary_squared(z), c);
-                    k = k + 1;
-                }
-            }
-            if k == max_iter {
-                std.print("⬜");
-            } else {
-                std.print(get_gradient(k));
-            }
-            x = x + x_step;
-            j = j + 1;
-        }
-        std.print("\n");
-        x = cx - width / 2;
-        y = y - y_step;
-        i = i + 1;
+    fn converges(x, y, lim, iters) {
+        return imaginary_abs(recurse(iters, imaginary(x, y))) < lim;
     }
+    let x = cx - width / 2;
+    let y = cy + height / 2;
+    let x_step = width / 100;
+    let y_step = height / 50;
+
+    for let y = cy + height / 2; y >= cy - height / 2; y = y - y_step; {
+        for let x = cx - width / 2; x <= cx + width / 2; x = x + x_step; {
+            if converges(x, y, 4, max_iter) {
+                std.print("#");
+            }
+            else {
+                std.print(".");
+            }
+        }
+        std.println();
+    }   
+    
 }
 
 fn main() {

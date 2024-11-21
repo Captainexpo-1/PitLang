@@ -67,6 +67,7 @@ impl<'a> Parser<'a> {
             TokenKind::Return => self.parse_return_statement(),
             TokenKind::LBrace => self.parse_block(),
             TokenKind::While => self.parse_while_statement(),
+            TokenKind::For => self.parse_for_statement(),
             TokenKind::SemiColon => {
                 self.advance();
                 self.parse_statement()
@@ -80,6 +81,20 @@ impl<'a> Parser<'a> {
                 }
                 expr
             }
+        }
+    }
+
+    fn parse_for_statement(&mut self) -> ASTNode {
+        self.expect(TokenKind::For);
+        let pre = self.parse_statement();
+        let cond = self.parse_expression(0);
+        let iter = self.parse_statement();
+        let block = self.parse_block();
+        return ASTNode::ForStatement {
+            start: Box::new(pre),
+            condition: Box::new(cond),
+            iter: Box::new(iter),
+            body: Box::new(block),
         }
     }
 

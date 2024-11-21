@@ -48,4 +48,10 @@ pub enum ASTNode {
         condition: Box<ASTNode>,
         body: Box<ASTNode>,
     },
+    ForStatement {
+        start: Box<ASTNode>,
+        condition: Box<ASTNode>,
+        iter: Box<ASTNode>,
+        body: Box<ASTNode>,
+    }
 }

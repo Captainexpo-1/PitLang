@@ -189,6 +189,19 @@ impl<'a> TreeWalk<'a> {
                 }
                 result
             }
+            ASTNode::ForStatement { start, condition, iter, body } => {
+                let mut result = Value::Null;
+                self.evaluate_node(start);
+                while self.evaluate_node(condition).is_truthy() {
+
+                    result = self.evaluate_node(body);
+                    if let Value::Return(_) = result {
+                        break;
+                    }
+                    self.evaluate_node(iter);
+                }
+                result
+            }
             ASTNode::FunctionCall { callee, arguments } => {
                 let func = self.evaluate_node(callee);
 
