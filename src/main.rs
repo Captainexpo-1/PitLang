@@ -1,11 +1,14 @@
-use std::env;
-use std::fs::File;
-use std::io::{BufReader, Read, Write};
 use pitlang::ast::ASTNode;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
 
+use std::env;
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+
+use pitlang::virtual_machine::codegen::Codegen;
+use pitlang::virtual_machine::interpreter::Interpreter;
 fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -108,5 +111,18 @@ fn main() {
     if ast_arg {
         println!("{:?}", ast);
     }
-    evaluator::evaluate(&ast);
+    //evaluator::evaluate(&ast);
+    let mut codegen = Codegen::new();
+    let result = codegen.generate(&ast);
+    if let Err(e) = result {
+        eprintln!("Error generating code: {}", e);
+        return;
+    }
+    println!("{}", codegen.dump_bytecode());
+    let mut interpreter = Interpreter::new(codegen.bytecode);
+    let result = interpreter.evaluate();
+    match result {
+        Ok(v) => println!("Result: {:?}", v),
+        Err(e) => eprintln!("Error: {}", e),
+    }
 }
