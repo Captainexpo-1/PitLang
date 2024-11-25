@@ -2,13 +2,15 @@ use pitlang::ast::ASTNode;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
+use pitlang::virtual_machine::bytecode::dump_bytecode;
 
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 
-use pitlang::virtual_machine::codegen::Codegen;
-use pitlang::virtual_machine::interpreter::Interpreter;
+use pitlang::virtual_machine::codegen::{compile_ast, Compiler};
+//use pitlang::virtual_machine::interpreter::Interpreter;
+
 fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -18,7 +20,7 @@ fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
 }
 
 fn main() {
-    //env::set_var("RUST_BACKTRACE", "1");
+    env::set_var("RUST_BACKTRACE", "1");
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -112,17 +114,22 @@ fn main() {
         println!("{:?}", ast);
     }
     //evaluator::evaluate(&ast);
-    let mut codegen = Codegen::new();
-    let result = codegen.generate(&ast);
-    if let Err(e) = result {
-        eprintln!("Error generating code: {}", e);
-        return;
+    let mut compiler = Compiler::new();
+    if let ASTNode::Program(statements) = ast {
+        for statement in statements {
+            let result = compile_ast(&mut compiler, statement);
+            if let Err(e) = result {
+                eprintln!("Error generating code: {}", e);
+                return;
+            }
+        }
     }
-    println!("{}", codegen.dump_bytecode());
-    let mut interpreter = Interpreter::new(codegen.bytecode);
-    let result = interpreter.evaluate();
-    match result {
-        Ok(v) => println!("Result: {:?}", v),
-        Err(e) => eprintln!("Error: {}", e),
-    }
+
+    println!("{}", dump_bytecode(&compiler.bytecode));
+    //let mut interpreter = Interpreter::new();
+    //let result = interpreter.run(&compiler.bytecode);
+    //match result {
+    //    Ok(v) => println!("Result: {:?}", v),
+    //    Err(e) => eprintln!("Error: {}", e),
+    //}
 }

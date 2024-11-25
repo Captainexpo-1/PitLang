@@ -40,12 +40,12 @@ pub enum ASTNode {
         body: Box<ASTNode>,
     },
     ReturnStatement(Box<ASTNode>),
-    MemberAccess {
-        object: Box<ASTNode>,
-        member: String,
-    },
     WhileStatement {
         condition: Box<ASTNode>,
         body: Box<ASTNode>,
+    },
+    MemberAccess {
+        object: Box<ASTNode>,
+        member: String,
     },
 }
