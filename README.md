@@ -80,17 +80,19 @@ let result = add(5, 3);
 ### If Statements
 
 ```rust
-if (condition) {
+if condition {
     // code to execute if condition is true
+} else if another_condition {
+    // code to execute if another_condition is true
 } else {
-    // code to execute if condition is false
+    // code to execute if all conditions are false
 }
 ```
 
 ### Loops
 
 ```rust
-while (condition) {
+while condition {
     // code to execute while condition is true
 }
 ```
@@ -197,7 +199,7 @@ std.print("Hello, World!");
 ```rust
 fn fizzbuzz(n) {
     for let i = 1; i <= 100; i = i + 1 {
-        if (i % 3 == 0 && i % 5 == 0) {
+        if i % 3 == 0 && i % 5 == 0 {
             std.print("FizzBuzz");
         } else if (i % 3 == 0) {
             std.print("Fizz");
@@ -216,17 +218,17 @@ fn fizzbuzz(n) {
 fn sieve(n) {
     let is_prime = []; // Initialize an empty array to store prime status
     let i = 0;
-    while (i <= n) {
+    while i <= n {
         is_prime.push(true); // Assume all numbers are prime initially
         i = i + 1;
     }
     is_prime.set(0, false); // 0 is not a prime number
     is_prime.set(1, false); // 1 is not a prime number
     let p = 2;
-    while (p * p <= n) {
-        if (is_prime.get(p)) { // If p is a prime
+    while p * p <= n {
+        if is_prime.get(p) { // If p is a prime
             let multiple = p * p;
-            while (multiple <= n) {
+            while multiple <= n {
                 is_prime.set(multiple, false); // Mark multiples of p as not prime
                 multiple = multiple + p;
             }
@@ -235,8 +237,8 @@ fn sieve(n) {
     }
     let primes = []; // Initialize an empty array to store prime numbers
     let num = 2;
-    while (num <= n) {
-        if (is_prime.get(num)) { // If num is a prime
+    while num <= n {
+        if is_prime.get(num) { // If num is a prime
             primes.push(num); // Add num to the primes array
         }
         num = num + 1;

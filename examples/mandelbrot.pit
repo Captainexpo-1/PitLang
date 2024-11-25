@@ -66,7 +66,7 @@ fn mandelbrot(cx, cy, width, height, max_iter) {
 
 fn main() {
     let args = std.argv();
-    if args.length() < 5 {
+    if args.length() < 7 {
         std.println("Usage: pitlang mandelbrot.pit <cx> <cy> <width> <height> <max_iter>")
         return;
     }
