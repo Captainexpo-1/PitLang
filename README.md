@@ -21,7 +21,7 @@ PitLang is a simple, interpreted programming language designed for educational p
 To run a PitLang script, use the following command:
 
 ```sh
-cargo run -- <script.pit> [arg1 arg2 ...]
+cargo run --release -- <script.pit> arg1 arg2 ...
 ```
 
 Alternatively, you can build the project and run the executable directly:
@@ -87,11 +87,17 @@ if (condition) {
 }
 ```
 
-### While Loops
+### Loops
 
 ```rust
 while (condition) {
     // code to execute while condition is true
+}
+```
+
+```rust
+for let i = 0; i < 5; i = i + 1 {
+    // code to execute for each iteration
 }
 ```
 
@@ -179,6 +185,32 @@ person.birthday(person); // "Happy Birthday! I am now 32 years old."
 - `num.ceil()`: Rounds the number up to the nearest integer.
 
 ## Examples
+
+### Hello World
+
+```rust
+std.print("Hello, World!");
+```
+
+### FizzBuzz
+
+```rust
+fn fizzbuzz(n) {
+    for let i = 1; i <= 100; i = i + 1 {
+        if (i % 3 == 0 && i % 5 == 0) {
+            std.print("FizzBuzz");
+        } else if (i % 3 == 0) {
+            std.print("Fizz");
+        } else if (i % 5 == 0) {
+            std.print("Buzz");
+        } else {
+            std.print(i);
+        }
+    }
+}
+```
+
+### Sieve of Eratosthenes
 
 ```rust
 fn sieve(n) {
