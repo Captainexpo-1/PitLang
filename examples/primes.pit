@@ -3,7 +3,7 @@ fn sieve(n){
     let i = 0;
     while (i <= n){
         is_prime.push(true);
-        i = i + 1;
+        ++i;
     }
 
     is_prime.set(0, false);

@@ -41,7 +41,7 @@ fn mandelbrot(cx, cy, width, height, max_iter) {
     fn get_iterations(x, y, lim, max_iter) {
         let z = imaginary(0, 0);
         let c = imaginary(x, y);
-        for let i = 0; i < max_iter; i = i + 1; {
+        for let i = 0; i < max_iter; ++i; {
             z = imaginary_add(imaginary_squared(z), c);
             if imaginary_abs(z) > lim {
                 return i;

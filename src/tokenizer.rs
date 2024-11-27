@@ -43,6 +43,9 @@ pub enum TokenKind {
     Or,
     BitAnd,
     BitOr,
+    BitXor,
+    Inc,
+    Dec,
     EOF,
 }
 
@@ -81,7 +84,7 @@ fn get_identifier(id: String, line: usize, column: usize) -> Token {
         "false" => Token::new(TokenKind::False, id, line, column),
         "while" => Token::new(TokenKind::While, id, line, column),
         "for" => Token::new(TokenKind::For, id, line, column),
-         
+
         _ => Token::new(TokenKind::Identifier, id, line, column),
     }
 }
@@ -96,7 +99,6 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
 
     let mut line: usize = 1;
     let mut col: usize = 1;
-
     while let Some(&c) = chars.peek() {
         match c {
             '0'..='9' => {
@@ -112,12 +114,30 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
                 tokens.push(Token::new(TokenKind::Number, value, line, col));
             }
             '+' => {
-                tokens.push(Token::new(TokenKind::Plus, "+".to_string(), line, col));
                 chars.next();
+                if let Some(&c) = chars.peek() {
+                    if c == '+' {
+                        tokens.push(Token::new(TokenKind::Inc, "++".to_string(), line, col));
+                        chars.next();
+                    } else {
+                        tokens.push(Token::new(TokenKind::Plus, "+".to_string(), line, col));
+                    }
+                } else {
+                    tokens.push(Token::new(TokenKind::Plus, "+".to_string(), line, col));
+                }
             }
             '-' => {
-                tokens.push(Token::new(TokenKind::Minus, "-".to_string(), line, col));
                 chars.next();
+                if let Some(&c) = chars.peek() {
+                    if c == '-' {
+                        tokens.push(Token::new(TokenKind::Dec, "--".to_string(), line, col));
+                        chars.next();
+                    } else {
+                        tokens.push(Token::new(TokenKind::Minus, "-".to_string(), line, col));
+                    }
+                } else {
+                    tokens.push(Token::new(TokenKind::Minus, "-".to_string(), line, col));
+                }
             }
             '*' => {
                 tokens.push(Token::new(TokenKind::Star, "*".to_string(), line, col));
@@ -132,6 +152,18 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
                                 line += 1;
                                 break;
                             }
+                            chars.next();
+                        }
+                    } else if c == '*' {
+                        // Multi-line comment
+                        let mut last_char: char = '/';
+                        while let Some(&c) = chars.peek() {
+                            if c == '/' && last_char == '*' {
+                                break;
+                            } else if c == '\n' {
+                                line += 1;
+                            }
+                            last_char = c;
                             chars.next();
                         }
                     } else {
@@ -316,6 +348,10 @@ pub fn tokenize(text: String) -> Result<Vec<Token>, TokenizerError> {
                     tokens.push(Token::new(TokenKind::BitAnd, "&".to_string(), line, col));
                     chars.next();
                 }
+            }
+            '^' => {
+                chars.next();
+                tokens.push(Token::new(TokenKind::BitXor, "^".to_string(), line, col))
             }
             '.' => {
                 chars.next();

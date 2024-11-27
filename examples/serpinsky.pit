@@ -7,7 +7,7 @@ fn get_serpinsky(n){
         let i = 0;
         while(i < y){ 
             output = output + " ";
-            i = i + 1;
+            ++i;
         }
   
         // printing '*' 
@@ -17,10 +17,10 @@ fn get_serpinsky(n){
                 output = output + "  ";
             else
                 output = output + "* "; 
-            x = x + 1;
+            ++x;
         }
         output = output + "\n";
-        y = y - 1;
+        --y;
     }
     return output;
 }    
@@ -29,7 +29,7 @@ fn pow(a, b) {
     let out = 1;
     while b > 0 {
         out = out * a;
-        b = b - 1;
+        --b;
     }
     return out;
 }

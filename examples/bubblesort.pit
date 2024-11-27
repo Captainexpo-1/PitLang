@@ -9,9 +9,9 @@ fn sort_list(list) {
                 list.set(j, list.get(j + 1));
                 list.set(j + 1, temp);
             }
-            j = j + 1;
+            ++j;
         }
-        i = i + 1;
+        ++i;
     }
 }
 
@@ -28,7 +28,7 @@ fn main(){
 
     while (i < arg) {
         list.push((std.random() * arg).round());
-        i = i + 1;
+        ++i;
     }
     std.println(list); // Unsorted list
     sort_list(list); // Sort the list in place

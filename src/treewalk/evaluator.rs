@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::stdlib::std_methods;
 
-pub fn evaluate(program: &ASTNode) -> Value {
+pub fn evaluate(program: ASTNode) -> Value {
     let mut evaluator = TreeWalk::new(match program {
         ASTNode::Program(statements) => statements,
         _ => {
@@ -25,8 +25,8 @@ pub fn runtime_error(msg: &str) -> Value {
 
 type MethodMap = HashMap<String, fn(&Value, Vec<Value>) -> Value>;
 
-struct TreeWalk<'a> {
-    program: &'a Vec<ASTNode>,
+pub struct TreeWalk {
+    program: Vec<ASTNode>,
     global_environment: Rc<RefCell<Scope>>,
     current_scope: Rc<RefCell<Scope>>,
 
@@ -35,8 +35,8 @@ struct TreeWalk<'a> {
     array_methods: MethodMap,
 }
 
-impl<'a> TreeWalk<'a> {
-    pub fn new(program: &'a Vec<ASTNode>) -> Self {
+impl TreeWalk {
+    pub fn new(program: Vec<ASTNode>) -> Self {
         let global_env = Rc::new(RefCell::new(Scope::new(None)));
         TreeWalk {
             program,
@@ -47,6 +47,17 @@ impl<'a> TreeWalk<'a> {
             number_methods: HashMap::new(),
             array_methods: HashMap::new(),
         }
+    }
+
+    pub fn evaluate(&mut self, program: ASTNode) -> Value {
+        self.program = match program {
+            ASTNode::Program(statements) => statements,
+            _ => {
+                runtime_error("Program node expected");
+                return Value::Null;
+            }
+        };
+        self.evaluate_program()
     }
 
     fn evaluate_program(&mut self) -> Value {
@@ -64,8 +75,8 @@ impl<'a> TreeWalk<'a> {
         );
 
         let mut result = Value::Null;
-        for stmt in self.program {
-            result = self.evaluate_node(stmt);
+        for stmt in self.program.clone() {
+            result = self.evaluate_node(&stmt);
             if let Value::Return(val) = result {
                 return *val;
             }
@@ -189,11 +200,15 @@ impl<'a> TreeWalk<'a> {
                 }
                 result
             }
-            ASTNode::ForStatement { start, condition, iter, body } => {
+            ASTNode::ForStatement {
+                start,
+                condition,
+                iter,
+                body,
+            } => {
                 let mut result = Value::Null;
                 self.evaluate_node(start);
                 while self.evaluate_node(condition).is_truthy() {
-
                     result = self.evaluate_node(body);
                     if let Value::Return(_) = result {
                         break;
@@ -345,6 +360,7 @@ impl<'a> TreeWalk<'a> {
                     }
                     TokenKind::BitAnd => self.evaluate_bitwise_and(&left_val, &right_val),
                     TokenKind::BitOr => self.evaluate_bitwise_or(&left_val, &right_val),
+                    TokenKind::BitXor => self.evaluate_bitwise_xor(&left_val, &right_val),
                     TokenKind::Assign => match left {
                         ASTNode::Variable(name) => {
                             let right_val = self.evaluate_node(right);
@@ -422,6 +438,15 @@ impl<'a> TreeWalk<'a> {
         }
     }
 
+    fn evaluate_bitwise_xor(&self, left_val: &Value, right_val: &Value) -> Value {
+        match (left_val, right_val) {
+            (Value::Number(a), Value::Number(b)) => {
+                Value::Number(((*a as i64) ^ (*b as i64)) as f64)
+            }
+            _ => self.bin_op_error(&TokenKind::BitAnd, left_val, right_val),
+        }
+    }
+
     fn evaluate_comparison<F>(&self, left_val: &Value, right_val: &Value, cmp: F) -> Value
     where
         F: Fn(f64, f64) -> bool,
@@ -444,6 +469,30 @@ impl<'a> TreeWalk<'a> {
             TokenKind::Bang => match val {
                 Value::Boolean(b) => Value::Boolean(!b),
                 _ => runtime_error("Operand must be a boolean"),
+            },
+            TokenKind::Inc => match val {
+                Value::Number(n) => {
+                    let new_val = Value::Number(n + 1.0);
+                    if let ASTNode::Variable(name) = operand {
+                        if !self.current_scope.borrow_mut().set(name, new_val.clone()) {
+                            runtime_error(&format!("Undefined variable: {}", name));
+                        }
+                    }
+                    new_val
+                }
+                _ => runtime_error("Operand must be a number"),
+            },
+            TokenKind::Dec => match val {
+                Value::Number(n) => {
+                    let new_val = Value::Number(n - 1.0);
+                    if let ASTNode::Variable(name) = operand {
+                        if !self.current_scope.borrow_mut().set(name, new_val.clone()) {
+                            runtime_error(&format!("Undefined variable: {}", name));
+                        }
+                    }
+                    new_val
+                }
+                _ => runtime_error("Operand must be a number"),
             },
             _ => runtime_error(format!("Unknown unary operator: {:?}", op).as_str()),
         }

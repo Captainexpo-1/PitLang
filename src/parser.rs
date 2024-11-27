@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
         let cond = self.parse_expression(0);
         let iter = self.parse_statement();
         let block = self.parse_block();
-        return ASTNode::ForStatement {
+        ASTNode::ForStatement {
             start: Box::new(pre),
             condition: Box::new(cond),
             iter: Box::new(iter),
@@ -354,6 +354,14 @@ impl<'a> Parser<'a> {
                 op: token.kind,
                 operand: Box::new(self.parse_expression(3)),
             },
+            TokenKind::Inc => ASTNode::UnaryOp {
+                op: token.kind,
+                operand: Box::new(self.parse_expression(3)),
+            },
+            TokenKind::Dec => ASTNode::UnaryOp {
+                op: token.kind,
+                operand: Box::new(self.parse_expression(3)),
+            },
             _ => {
                 let kind = token.kind;
                 let token = token.clone();
@@ -366,20 +374,21 @@ impl<'a> Parser<'a> {
     fn get_operator_precedence(&self, kind: &TokenKind) -> u8 {
         match kind {
             TokenKind::Assign => 1,
-            TokenKind::Or => 2,
-            TokenKind::And => 3,
-            TokenKind::BitAnd => 4,
-            //TokenKind::BitXor => 5,
-            TokenKind::BitOr => 6,
-            TokenKind::Equal | TokenKind::NotEqual => 7,
+            TokenKind::Inc | TokenKind::Dec => 2,
+            TokenKind::Or => 3,
+            TokenKind::And => 4,
+            TokenKind::BitAnd => 5,
+            TokenKind::BitXor => 6,
+            TokenKind::BitOr => 7,
+            TokenKind::Equal | TokenKind::NotEqual => 8,
             TokenKind::Less
             | TokenKind::LessEqual
             | TokenKind::Greater
-            | TokenKind::GreaterEqual => 8,
-            TokenKind::Plus | TokenKind::Minus => 9,
-            TokenKind::Star | TokenKind::Mod | TokenKind::Slash => 10,
-            TokenKind::LParen => 11,
-            TokenKind::Dot => 12,
+            | TokenKind::GreaterEqual => 9,
+            TokenKind::Plus | TokenKind::Minus => 10,
+            TokenKind::Star | TokenKind::Mod | TokenKind::Slash => 11,
+            TokenKind::LParen => 12,
+            TokenKind::Dot => 13,
             _ => 0,
         }
     }

@@ -1,10 +1,10 @@
-use std::env;
-use std::fs::File;
-use std::io::{BufReader, Read, Write};
 use pitlang::ast::ASTNode;
 use pitlang::parser;
 use pitlang::tokenizer;
 use pitlang::treewalk::evaluator;
+use std::env;
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
 
 fn get_file_contents(file_path: &str) -> Result<String, std::io::Error> {
     let file = File::open(file_path)?;
@@ -35,6 +35,9 @@ fn main() {
     }
 
     if args.contains(&String::from("-repl")) {
+        let temp = Vec::new();
+        let mut evaluator = evaluator::TreeWalk::new(temp);
+        let mut ast: ASTNode;
         loop {
             let mut input = String::new();
             print!("> ");
@@ -50,7 +53,7 @@ fn main() {
                     continue;
                 }
             };
-            let ast = match parser::parse(tokens.as_slice()) {
+            ast = match parser::parse(tokens.as_slice()) {
                 Ok(a) => a,
                 Err(e) => {
                     eprintln!("Parsing error: ");
@@ -68,7 +71,8 @@ fn main() {
             if ast_arg {
                 println!("{:?}", ast);
             }
-            println!("{:?}", evaluator::evaluate(&ast));
+
+            println!("{:?}", evaluator.evaluate(ast.clone()));
         }
     }
 
@@ -108,5 +112,5 @@ fn main() {
     if ast_arg {
         println!("{:?}", ast);
     }
-    evaluator::evaluate(&ast);
+    evaluator::evaluate(ast);
 }
