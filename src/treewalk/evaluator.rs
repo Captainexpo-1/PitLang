@@ -1,6 +1,6 @@
 use crate::ast::ASTNode;
 use crate::tokenizer::TokenKind;
-use crate::treewalk::stdlib::{array_methods, number_methods, string_methods};
+use crate::treewalk::stdlib::{array_methods, number_methods, object_methods, string_methods};
 use crate::treewalk::value::{Scope, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -33,6 +33,7 @@ pub struct TreeWalk {
     string_methods: MethodMap,
     number_methods: MethodMap,
     array_methods: MethodMap,
+    object_methods: MethodMap,
 }
 
 impl TreeWalk {
@@ -46,6 +47,7 @@ impl TreeWalk {
             string_methods: HashMap::new(),
             number_methods: HashMap::new(),
             array_methods: HashMap::new(),
+            object_methods: HashMap::new(),
         }
     }
 
@@ -64,6 +66,7 @@ impl TreeWalk {
         self.string_methods = string_methods();
         self.number_methods = number_methods();
         self.array_methods = array_methods();
+        self.object_methods = object_methods();
 
         let mut std_map = HashMap::new();
         for method in std_methods() {
@@ -119,15 +122,21 @@ impl TreeWalk {
             ASTNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
             ASTNode::MemberAccess { object, member } => {
                 let obj_val = self.evaluate_node(object);
-
+                let obj_val_2 = obj_val.clone();
                 if let Value::Object(properties) = obj_val {
                     let properties = properties.borrow();
                     match properties.get(member) {
                         Some(val) => val.clone(),
-                        None => runtime_error(&format!(
-                            "Property '{}' not found in object: {:?}",
-                            member, properties
-                        )),
+                        None => {
+                            if let Some(_method) = self.object_methods.get(member) {
+                                return Value::Method {
+                                    receiver: Box::new(obj_val_2.clone()),
+                                    method_name: member.clone(),
+                                };
+                            }
+                            runtime_error(&format!("Property '{}' not found", member));
+                            Value::Null
+                        }
                     }
                 } else {
                     Value::Method {
@@ -294,6 +303,7 @@ impl TreeWalk {
             Value::String(_) => self.string_methods.get(method_name),
             Value::Number(_) => self.number_methods.get(method_name),
             Value::Array(_) => self.array_methods.get(method_name),
+            Value::Object(_) => self.object_methods.get(method_name),
             _ => None,
         };
 

@@ -66,7 +66,6 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
             }
         },
     );
-
     methods.insert(
         "write_file".to_string(),
         |_this: &Value, args: Vec<Value>| {
@@ -92,7 +91,6 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
             }
         },
     );
-
     methods.insert(
         "read_file".to_string(),
         |_this: &Value, args: Vec<Value>| {
@@ -111,7 +109,6 @@ pub fn std_methods() -> HashMap<String, StdMethod> {
             }
         },
     );
-
     methods.insert("exit".to_string(), |_this: &Value, args: Vec<Value>| {
         if let Value::Number(code) = args.first().unwrap_or(&Value::Null) {
             std::process::exit(*code as i32);
@@ -542,6 +539,36 @@ pub fn array_methods() -> HashMap<String, StdMethod> {
             let copy = a.borrow().clone();
             Value::Array(Rc::new(RefCell::new(copy)))
         } else {
+            Value::Null // Unreachable
+        }
+    });
+    methods
+}
+
+pub fn object_methods() -> HashMap<String, StdMethod> {
+    let mut methods: HashMap<String, StdMethod> = HashMap::new();
+
+    methods.insert("set".to_string(), |this: &Value, _args: Vec<Value>| {
+        if let Value::Object(o) = this {
+            if let Value::String(key) = &_args[0] {
+                o.borrow_mut().insert(key.clone(), _args[1].clone());
+                Value::Null
+            } else {
+                runtime_error(format!("Object key must be a string: got {:?}", _args[0]).as_str())
+            }
+        } else {
+            Value::Null // Unreachable
+        }
+    });
+    methods.insert("get".to_string(), |this: &Value, _args: Vec<Value>| {
+        if let Value::Object(o) = this {
+            if let Value::String(key) = &_args[0] {
+                o.borrow_mut().get(key).expect("Key not found").clone()
+            } else {
+                runtime_error(format!("Object key must be a string: got {:?}", _args[0]).as_str())
+            }
+        } else {
+            println!("{:?}", this);
             Value::Null // Unreachable
         }
     });
